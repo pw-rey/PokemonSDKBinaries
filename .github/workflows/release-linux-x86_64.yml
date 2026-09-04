@@ -1,0 +1,204 @@
+name: Release Linux x86-64
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# A release is authorized by the protected v* tag itself.  Do not add a
+# workflow_dispatch trigger: GitHub grants it to repository Write users.
+concurrency:
+  group: linux-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux_x86_64:
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Prepare clean CI workspace
+        run: |
+          # Hosted runners are fresh.  act --bind intentionally reuses the
+          # local workspace, so clear only CI-generated directories here.
+          rm -rf sources generated dist
+          mkdir -p sources generated dist
+
+      - name: Install release tools
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes
+          p7zip-full patchelf python3-requests libasound2t64 libx11-6 libxcursor1
+          libxi6 libxrandr2 libgl1
+
+      - name: Read Linux release configuration
+        run: sed -n '/^[A-Za-z_][A-Za-z0-9_]*=/p' config/linux-x86_64.conf >> "$GITHUB_ENV"
+
+      - name: Fetch pinned component sources
+        run: |
+          checkout_pinned_commit() {
+            local repository="$1"
+            local revision="$2"
+            local destination="$3"
+
+            # Fetch every advertised branch before resolving the immutable
+            # revision. A reviewed release may intentionally pin a commit on
+            # a temporary integration branch rather than the default branch.
+            git clone --no-checkout --no-single-branch "$repository" "$destination"
+            git -C "$destination" rev-parse --verify "${revision}^{commit}" >/dev/null
+            git -C "$destination" checkout --detach "$revision"
+            test "$(git -C "$destination" rev-parse HEAD)" = "$revision"
+            # LiteRGSS carries LiteCGSS as a pinned submodule.  Fetch it only
+            # after the parent commit was detached and verified, so the build
+            # receives the exact gitlink recorded by that trusted revision.
+            git -C "$destination" submodule update --init --recursive
+          }
+
+          checkout_pinned_commit "$LITERGSS_REPOSITORY" "$LITERGSS_REF" sources/litergss
+          checkout_pinned_commit "$RUBY_FMOD_REPOSITORY" "$RUBY_FMOD_REF" sources/ruby-fmod
+          checkout_pinned_commit "$SFEMOVIE_REPOSITORY" "$SFEMOVIE_REF" sources/sfemovie
+          checkout_pinned_commit "$SFEMOVIE_RUBY_REPOSITORY" "$SFEMOVIE_RUBY_REF" sources/sfemovie-ruby
+
+          # Fail here, rather than deep inside the Docker build, if a clone or
+          # submodule checkout did not provide LiteRGSS's normal build files.
+          test -f sources/litergss/Rakefile
+          test -f sources/litergss/external/litecgss/Rakefile
+
+      - name: Fetch authorized FMOD Core SDK
+        env:
+          FMOD_USER: ${{ secrets.FMOD_USER }}
+          FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
+        run: |
+          python3 .github/scripts/download_fmod.py \
+            --version "$FMOD_DOWNLOAD_VERSION" \
+            --platform linux \
+            --output /tmp/fmod-download.tar.gz
+      
+          rm -rf sources/fmod-sdk
+          mkdir -p sources/fmod-sdk
+      
+          # The FMOD download endpoint currently returns an archive containing the
+          # actual platform archive, e.g. fmodstudioapi20220linux.tar.gz.
+          tar -xzf /tmp/fmod-download.tar.gz -C sources/fmod-sdk
+      
+          inner_archive="$(find sources/fmod-sdk \
+            -maxdepth 1 \
+            -type f \
+            -name 'fmodstudioapi*linux.tar.gz' \
+            -print -quit)"
+      
+          if [ -n "$inner_archive" ]; then
+            echo "Extracting nested FMOD SDK archive: $(basename "$inner_archive")"
+            tar -xzf "$inner_archive" -C sources/fmod-sdk
+            rm -f "$inner_archive"
+          fi
+      
+          fmod_header="$(find sources/fmod-sdk \
+            -type f \
+            -name 'fmod_common.h' \
+            -print -quit)"
+      
+          if [ -z "$fmod_header" ]; then
+            echo "FMOD SDK extracted successfully, but fmod_common.h was not found." >&2
+            echo "Extracted contents:" >&2
+            find sources/fmod-sdk -maxdepth 8 -type f | sort >&2
+            exit 1
+          fi
+      
+          fmod_include_dir="$(dirname "$fmod_header")"
+          fmod_root="$(cd "$fmod_include_dir/.." && pwd)"
+      
+          echo "FMOD Core API root: $fmod_root"
+          printf 'FMOD_SDK_DIR=%s\n' "$fmod_root" >> "$GITHUB_ENV"
+
+      - name: Build LiteRGSS, LiteCGSS and SFMLAudio
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          RUBY_SHA256="$RUBY_SHA256" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/litergss" \
+          sources/litergss/docker/linux-gnu/build.sh
+
+      - name: Build RubyFMOD and FMOD runtime
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          SOURCE_DIR="$GITHUB_WORKSPACE/sources/ruby-fmod" \
+          FMOD_SDK_DIR="$FMOD_SDK_DIR" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/rubyfmod" \
+          docker/linux-gnu/rubyfmod/build.sh
+
+      - name: Build sfeMovie and FFmpeg 6.0 runtime
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
+          docker/linux-gnu/sfemovie/build.sh
+
+      - name: Build SFEMovie Ruby binding
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          SFEMOVIE_RUBY_SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie-ruby" \
+          SFEMOVIE_SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie" \
+          LITERGSS_SOURCE_DIR="$GITHUB_WORKSPACE/sources/litergss" \
+          LITERGSS_BUILD_DIR="$GITHUB_WORKSPACE/generated/litergss/build-support" \
+          SFEMOVIE_RUNTIME_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/sfemovie-ruby" \
+          docker/linux-gnu/sfemovie-ruby/build.sh
+
+      - name: Assemble Linux-x86-64.7z
+        run: |
+          LITERGSS_DIR="$GITHUB_WORKSPACE/generated/litergss" \
+          RUBY_FMOD_DIR="$GITHUB_WORKSPACE/generated/rubyfmod" \
+          SFEMOVIE_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
+          SFEMOVIE_RUBY_DIR="$GITHUB_WORKSPACE/generated/sfemovie-ruby" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" \
+          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/Linux-x86-64.7z" \
+          docker/linux-gnu/assemble-release.sh
+
+      - name: Smoke test the assembled payload on glibc 2.28
+        run: RELEASE_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" docker/linux-gnu/verify-release.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Linux-x86-64
+          path: dist/Linux-x86-64.7z
+          if-no-files-found: error
+
+
+  # Add each future Windows/macOS build job to this list. GitHub only schedules
+  # this job after every required platform job completed successfully.
+  release:
+    needs: [linux_x86_64]
+    runs-on: ubuntu-24.04
+    if: ${{ success() }}
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Linux-x86-64
+          path: dist
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s dist/Linux-x86-64.7z
+          if [[ "${RELEASE_DRY_RUN:-}" == "true" ]]; then
+            echo "Dry run: would publish dist/Linux-x86-64.7z to release ${RELEASE_TAG}."
+            sha256sum dist/Linux-x86-64.7z
+            exit 0
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/Linux-x86-64.7z --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/Linux-x86-64.7z --title "$RELEASE_TAG" --generate-notes
+          fi
