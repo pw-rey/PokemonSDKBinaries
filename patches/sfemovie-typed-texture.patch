@@ -1,0 +1,111 @@
+diff --git a/Rakefile b/Rakefile
+index 35fc9f8..628f53a 100644
+--- a/Rakefile
++++ b/Rakefile
+@@ -31,6 +31,9 @@ build_paths = {
+     include: ENV['LITECGSS_INCLUDE_DIR'],
+     lib: ENV['LITECGSS_LIBRARY_DIR']
+   },
++  'LiteRGSS' => {
++    include: ENV['LITERGSS_INCLUDE_DIR']
++  },
+   'sfml-system' => {
+     include: ENV['SFML_INCLUDE_DIR'],
+     lib: ENV['SFML_LIBRARY_DIR']
+diff --git a/ext/SFEMovie/SFEMovie.cpp b/ext/SFEMovie/SFEMovie.cpp
+index 4f3fa08..ff76992 100644
+--- a/ext/SFEMovie/SFEMovie.cpp
++++ b/ext/SFEMovie/SFEMovie.cpp
+@@ -1,10 +1,24 @@
+ #include "rb_common.h"
+-#include "Texture_Bitmap.h"
++#include <Texture_Bitmap.h>
+ 
+ VALUE rb_cMovie = Qnil;
+ VALUE rb_cBitmap = Qnil;
+ VALUE rb_eRGSSError = Qnil;
+ 
++// LiteRGSS now wraps Bitmap/Texture instances with Ruby TypedData.  The
++// descriptor is owned by LiteRGSS, so obtain it from an actual Bitmap object:
++// constructing an equivalent descriptor in this extension would have a
++// different address and Ruby would reject valid Texture subclasses.
++static const rb_data_type_t* bitmap_data_type = nullptr;
++
++static sf::Texture& bitmap_texture(VALUE bitmap) {
++  auto* wrapper = static_cast<TextureElement*>(rb_check_typeddata(bitmap, bitmap_data_type));
++  if (wrapper == nullptr || wrapper->instance() == nullptr) {
++    rb_raise(rb_eRGSSError, "Disposed or uninitialized Texture.");
++  }
++  return wrapper->instance()->raw();
++}
++
+ void rb_Movie_Free(void* data)
+ {
+   sfe::Movie* pdata = reinterpret_cast<sfe::Movie*>(data);
+@@ -156,11 +170,12 @@ VALUE rb_Mfit(int argc, VALUE* argv, VALUE self) {
+ VALUE rb_MgetCurrentImage(VALUE self) {
+   RB_GET_DATA(sfe::Movie, Qnil);
+ 
+-  auto image = data->getCurrentImage();
+-	VALUE bmp = rb_obj_alloc(rb_cBitmap);
+-	sf::Texture& bmpTexture = rb::Get<TextureElement>(bmp)->raw();
+-	bmpTexture = image;
+-	return bmp;
++  const auto& image = data->getCurrentImage();
++  const auto size = image.getSize();
++  VALUE args[] = {UINT2NUM(size.x), UINT2NUM(size.y)};
++  VALUE bmp = rb_class_new_instance(2, args, rb_cBitmap);
++  bitmap_texture(bmp) = image;
++  return bmp;
+ }
+ 
+ VALUE rb_mUpdateBitmap(VALUE self, VALUE bitmap) {
+@@ -168,9 +183,8 @@ VALUE rb_mUpdateBitmap(VALUE self, VALUE bitmap) {
+   if (rb_obj_is_kind_of(bitmap, rb_cBitmap) != Qtrue) {
+     return Qnil;
+   }
+-  auto image = data->getCurrentImage();
+-	sf::Texture& bmpTexture = rb::Get<TextureElement>(bitmap)->raw();
+-	bmpTexture = image;
++  sf::Texture& texture = bitmap_texture(bitmap);
++  texture = data->getCurrentImage();
+   return Qnil;
+ }
+ 
+@@ -179,6 +193,12 @@ extern "C" {
+     auto rb_mLiteRGSS = rb_const_get(rb_cObject, rb_intern("LiteRGSS"));
+     rb_cBitmap = rb_const_get(rb_mLiteRGSS, rb_intern("Bitmap"));
+ 	  rb_eRGSSError = rb_const_get(rb_mLiteRGSS, rb_intern("Error"));
++    VALUE probe = rb_obj_alloc(rb_cBitmap);
++    if (!RTYPEDDATA_P(probe)) {
++      rb_raise(rb_eTypeError, "SFEMovie requires a TypedData LiteRGSS::Bitmap.");
++    }
++    bitmap_data_type = RTYPEDDATA_TYPE(probe);
++    RB_GC_GUARD(probe);
+     VALUE rb_mSFE = rb_define_module("SFE");
+     rb_cMovie = rb_define_class_under(rb_mSFE, "Movie", rb_cObject);
+     rb_define_alloc_func(rb_cMovie, rb_Movie_Alloc);
+diff --git a/ext/SFEMovie/extconf.rb b/ext/SFEMovie/extconf.rb
+index a710921..ca5d802 100644
+--- a/ext/SFEMovie/extconf.rb
++++ b/ext/SFEMovie/extconf.rb
+@@ -9,10 +9,18 @@ ext_name = 'SFEMovie'
+ # the generated Makefile, including rake-compiler's isolated build directory.
+ dependencies = %w[sfeMovie LiteCGSS_engine sfml-system sfml-graphics]
+ dependencies.each do |library|
+-  _include_dir, library_dir = dir_config(library)
++  include_dir, library_dir = dir_config(library)
++  $CPPFLAGS << " -I#{include_dir}" if include_dir && !include_dir.empty?
+   $LDFLAGS << " -L#{library_dir}" if library_dir && !library_dir.empty?
+ end
+ 
++# Texture_Bitmap.h is supplied by the matching LiteRGSS build.  It is a
++# compile-time header dependency only; LiteRGSS itself is loaded by Ruby. The
++# bundled header remains a fallback for normal standalone builds.
++litergss_include, = dir_config('LiteRGSS')
++$CPPFLAGS << " -I#{litergss_include}" if litergss_include && !litergss_include.empty?
++$CPPFLAGS << " -I#{__dir__}"
++
+ dependencies.each do |library|
+   abort "Missing required library: #{library}" unless have_library(library)
+ end

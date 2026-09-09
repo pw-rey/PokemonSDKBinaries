@@ -1,0 +1,70 @@
+name: Release PSDK runtimes
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# A release is authorized by the protected v* tag itself.  Do not add a
+# workflow_dispatch trigger: GitHub grants it to repository Write users.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux_x86_64:
+    uses: ./.github/workflows/build-linux-x86_64.yml
+    secrets:
+      FMOD_USER: ${{ secrets.FMOD_USER }}
+      FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
+
+  macos_arm64:
+    uses: ./.github/workflows/build-macos-arm64.yml
+    secrets:
+      FMOD_USER: ${{ secrets.FMOD_USER }}
+      FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
+
+  # Add each future platform build job to this list. GitHub only schedules
+  # this job after every required platform job completed successfully.
+  release:
+    needs: [linux_x86_64, macos_arm64]
+    runs-on: ubuntu-24.04
+    if: ${{ success() }}
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Linux-x86-64
+          path: dist
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: MacOS-arm64
+          path: dist
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          test -s dist/Linux-x86-64.7z
+          test -s dist/MacOS-arm64.7z
+          (cd dist; sha256sum -c MacOS-arm64.7z.sha256)
+          assets=(dist/Linux-x86-64.7z dist/MacOS-arm64.7z dist/MacOS-arm64.7z.sha256)
+          if [[ "${RELEASE_DRY_RUN:-}" == "true" ]]; then
+            echo "Dry run: would publish Linux and macOS runtimes to release ${RELEASE_TAG}."
+            sha256sum "${assets[@]}"
+            exit 0
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" --title "$RELEASE_TAG" --generate-notes
+          fi

@@ -1,0 +1,106 @@
+name: Build Linux x86-64
+
+on:
+  workflow_call:
+    secrets:
+      FMOD_USER:
+        required: true
+      FMOD_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Prepare clean CI workspace
+        run: |
+          # Hosted runners are fresh.  act --bind intentionally reuses the
+          # local workspace, so clear only CI-generated directories here.
+          rm -rf sources generated dist
+          mkdir -p sources generated dist
+
+      - name: Install release tools
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes
+          p7zip-full patchelf python3-requests libasound2t64 libx11-6 libxcursor1
+          libxi6 libxrandr2 libgl1
+
+      - name: Read Linux release configuration
+        run: sed -n '/^[A-Za-z_][A-Za-z0-9_]*=/p' config/linux-x86_64.conf >> "$GITHUB_ENV"
+
+      - name: Fetch pinned component sources
+        run: bash .github/scripts/fetch-sources.sh config/linux-x86_64.conf
+
+      - name: Fetch authorized FMOD Core SDK
+        env:
+          FMOD_USER: ${{ secrets.FMOD_USER }}
+          FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
+        run: |
+          python3 .github/scripts/download_fmod.py \
+            --version "$FMOD_DOWNLOAD_VERSION" \
+            --platform linux \
+            --output /tmp/fmod-download.tar.gz
+
+          bash docker/linux-gnu/extract-fmod.sh /tmp/fmod-download.tar.gz
+
+      - name: Build LiteRGSS, LiteCGSS and SFMLAudio
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          RUBY_SHA256="$RUBY_SHA256" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/litergss" \
+          sources/litergss/docker/linux-gnu/build.sh
+
+      - name: Build RubyFMOD and FMOD runtime
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          SOURCE_DIR="$GITHUB_WORKSPACE/sources/ruby-fmod" \
+          FMOD_SDK_DIR="$FMOD_SDK_DIR" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/rubyfmod" \
+          docker/linux-gnu/rubyfmod/build.sh
+
+      - name: Build sfeMovie and FFmpeg 6.0 runtime
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
+          docker/linux-gnu/sfemovie/build.sh
+
+      - name: Build SFEMovie Ruby binding
+        run: |
+          RUBY_VERSION="$RUBY_VERSION" \
+          SFEMOVIE_RUBY_SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie-ruby" \
+          SFEMOVIE_SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie" \
+          LITERGSS_SOURCE_DIR="$GITHUB_WORKSPACE/sources/litergss" \
+          LITERGSS_BUILD_DIR="$GITHUB_WORKSPACE/generated/litergss/build-support" \
+          SFEMOVIE_RUNTIME_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/sfemovie-ruby" \
+          docker/linux-gnu/sfemovie-ruby/build.sh
+
+      - name: Assemble Linux-x86-64.7z
+        run: |
+          LITERGSS_DIR="$GITHUB_WORKSPACE/generated/litergss" \
+          RUBY_FMOD_DIR="$GITHUB_WORKSPACE/generated/rubyfmod" \
+          SFEMOVIE_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
+          SFEMOVIE_RUBY_DIR="$GITHUB_WORKSPACE/generated/sfemovie-ruby" \
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" \
+          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/Linux-x86-64.7z" \
+          docker/linux-gnu/assemble-release.sh
+
+      - name: Smoke test the assembled payload on glibc 2.28
+        run: RELEASE_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" docker/linux-gnu/verify-release.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Linux-x86-64
+          path: dist/Linux-x86-64.7z
+          if-no-files-found: error

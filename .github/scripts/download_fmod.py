@@ -26,6 +26,7 @@ DOWNLOAD_LINK_URL = "https://www.fmod.com/api-get-download-link"
 
 PLATFORMS = {
     "linux": ("Linux", "linux.tar.gz"),
+    "macos": ("Mac", "mac-installer.dmg"),
 }
 
 REQUEST_TIMEOUT = 30

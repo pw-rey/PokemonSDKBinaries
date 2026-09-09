@@ -1,0 +1,87 @@
+name: Build macOS ARM64
+
+on:
+  workflow_call:
+    secrets:
+      FMOD_USER:
+        required: true
+      FMOD_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify architecture and install build tools
+        run: |
+          test "$(uname -m)" = arm64
+          brew install cmake ninja pkgconf sevenzip
+          python3 -m venv generated/download-venv
+          generated/download-venv/bin/pip install requests==2.32.5
+      - name: Read macOS release configuration
+        run: sed -n '/^[A-Za-z_][A-Za-z0-9_]*=/p' config/macos-arm64.conf >> "$GITHUB_ENV"
+      - name: Fetch pinned component sources
+        run: bash .github/scripts/fetch-sources.sh config/macos-arm64.conf
+      - name: Download authorized FMOD macOS SDK
+        env:
+          FMOD_USER: ${{ secrets.FMOD_USER }}
+          FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
+        run: |
+          generated/download-venv/bin/python .github/scripts/download_fmod.py \
+            --version "$FMOD_DOWNLOAD_VERSION" --platform macos --output sources/fmod-download.dmg
+          bash macos/arm64/extract-fmod.sh sources/fmod-download.dmg
+      - name: Build runtime dependencies for macOS 11 ARM64
+        run: bash macos/arm64/build.sh dependencies
+      - name: Build embedded Ruby
+        run: bash macos/arm64/build.sh ruby
+      - name: Build LiteRGSS, RubyFMOD, SFMLAudio and SFEMovie
+        run: bash macos/arm64/build.sh components
+      - name: Assemble MacOS-arm64.7z
+        run: |
+          OUTPUT_DIR="$GITHUB_WORKSPACE/generated/MacOS-arm64/ruby-dist" \
+          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/MacOS-arm64.7z" \
+          bash macos/arm64/assemble-release.sh
+      - name: Smoke test the assembled payload
+        run: RELEASE_DIR="$GITHUB_WORKSPACE/generated/MacOS-arm64/ruby-dist" bash macos/arm64/verify-release.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: MacOS-arm64
+          path: |
+            dist/MacOS-arm64.7z
+            dist/MacOS-arm64.7z.sha256
+          if-no-files-found: error
+      - name: Remove temporary FMOD SDK
+        if: ${{ always() }}
+        run: rm -rf sources/fmod-sdk sources/fmod-download.dmg
+
+  verify:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: MacOS-arm64
+          path: dist
+      - name: Verify archive on a fresh ARM runner without build dependencies
+        run: |
+          test "$(uname -m)" = arm64
+          brew install sevenzip
+          (cd dist; shasum -a 256 -c MacOS-arm64.7z.sha256)
+          mkdir -p generated/MacOS-arm64
+          7zz x dist/MacOS-arm64.7z -ogenerated/MacOS-arm64
+          bash macos/arm64/verify-release.sh
