@@ -14,27 +14,28 @@ docker run --rm --entrypoint /bin/bash \
     # These are intentionally host-provided by the release: they select the
     # target desktop X11/GL driver and ALSA device stack.
     dnf install -y --setopt=install_weak_deps=False \
-      alsa-lib libX11 libXcursor libXi libXrandr libstdc++ mesa-libGL
-    export LD_LIBRARY_PATH=/release/lib
-    ruby_library_dir=$(find /release/lib/ruby -mindepth 1 -maxdepth 1 -type d -name "[0-9]*" -print -quit)
-    ruby_arch_library_dir=$(find "$ruby_library_dir" -mindepth 1 -maxdepth 1 -type d -name "*-linux*" -print -quit)
-    /release/bin/ruby -I/release/lib -I"$ruby_library_dir" -I"$ruby_arch_library_dir" -e '\''
-      require "LiteRGSS"
-      require "SFMLAudio"
-      require "RubyFmod"
-      require "SFEMovie"
-      require "fiddle/import"
-      Fiddle.dlopen(Dir["/release/lib/libsfeMovie.so.*"].first)
-      abort "Unexpected FMOD API version" unless FMOD::VERSION == 0x00020220
-      abort "SFEMovie extension did not define SFE::Movie" unless defined?(SFE::Movie)
-      module AVCodec
-        extend Fiddle::Importer
-        dlload "/release/lib/libavcodec.so.60"
-        extern "void *avcodec_find_decoder_by_name(const char *)"
-      end
-      %w[png mov_text].each do |decoder|
-        abort "Missing required FFmpeg decoder: #{decoder}" if AVCodec.avcodec_find_decoder_by_name(decoder).to_i == 0
-      end
-      puts "All staged Linux runtime components load on glibc 2.28"
-    '\''
+      alsa-lib libX11 libXcursor libXi libXrandr libstdc++ mesa-libGL \
+      mesa-dri-drivers xorg-x11-server-Xvfb
+    # SFML creates an OpenGL context even for an audio-only Movie. Provide a
+    # virtual display and silent OpenAL backend on headless CI/act runners.
+    export DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 ALSOFT_DRIVERS=null
+    Xvfb "$DISPLAY" -screen 0 640x480x24 -nolisten tcp >/tmp/psdk-xvfb.log 2>&1 &
+    xvfb_pid=$!
+    trap "kill $xvfb_pid 2>/dev/null || true" EXIT
+    for attempt in {1..50}; do
+      test ! -S /tmp/.X11-unix/X99 || break
+      kill -0 "$xvfb_pid" 2>/dev/null || { cat /tmp/psdk-xvfb.log; exit 1; }
+      sleep 0.1
+    done
+    test -S /tmp/.X11-unix/X99 || { cat /tmp/psdk-xvfb.log; exit 1; }
+    # Exercise relocation and the packaged setup script in a path with spaces.
+    mkdir -p "/tmp/relocated game"
+    cp -a /release "/tmp/relocated game/ruby-dist"
+    cd "/tmp/relocated game/ruby-dist"
+    unset RUBYOPT RUBYLIB GEM_HOME GEM_PATH
+    export HOME=/tmp/psdk-home
+    mkdir -p "$HOME"
+    source ./setup.sh
+    export PSDK_TEST_PLATFORM=linux
+    ruby -I"$PWD/lib" lib/psdk-runtime/runtime-functional.rb
   '

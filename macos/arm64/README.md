@@ -64,8 +64,7 @@ CMake projects.
 | `config/macos-arm64.conf` | Component pins, Ruby/FMOD versions and deployment target. |
 | `config/macos-arm64-sources.lock` | Source archive URLs and SHA-256 hashes. |
 | `.github/scripts/fetch-sources.sh` | Shared Linux/macOS pinned component fetching; also verifies macOS dependency archives. Replaces macOS `fetch.sh` and inline Linux checkout code. |
-| `.github/scripts/prepare-sfemovie-ruby.sh` | Shared Linux/macOS preparation of disposable Ruby binding checkouts: applies the texture patch and links matching pinned LiteRGSS/LiteCGSS headers. |
-| `patches/sfemovie-typed-texture.patch` | Fixes the binding's old Ruby Data access and initializes snapshot bitmaps; preserves upstream extconf/CMake files. |
+| `.github/scripts/prepare-sfemovie-ruby.sh` | Shared Linux/macOS preparation of disposable Ruby binding checkouts: links matching pinned LiteRGSS/LiteCGSS headers. |
 | `tests/sfemovie-texture.rb` | Generates an uncompressed green AVI and reference PNG; checks actual movie pixels, Bitmap subclasses, snapshots and disposed/uninitialized objects. Called by macOS smoke verification. |
 | `macos/arm64/build.sh` | Runs upstream configure/CMake/extconf builds with ARM64/macOS 11 flags; isolates dependencies; builds Ruby, SFML and LiteCGSS once. |
 | `macos/arm64/sfemovie-channel-layout.patch` | Corrects two FFmpeg resampler option names in the temporary checkout; details below. |
@@ -74,7 +73,7 @@ CMake projects.
 | `macos/arm64/setup.sh` | Sourceable legacy launcher interface for relocated Ruby 3.4. |
 | `macos/arm64/clean_load_path.rb` | Legacy require target; Ruby and setup.sh now handle path isolation. |
 | `macos/arm64/verify-release.sh` | Renamed from `verify.sh` to match Linux; audits and relocates the package to a path containing spaces and runs tests with a clean environment. |
-| `macos/arm64/smoke.rb` | Ruby/stdlib/binding, audio decoding, OpenGL texture and movie tests with generated test data. |
+| `macos/arm64/smoke.rb` | macOS adapter for the packaged shared functional suite in `tests/runtime-functional.rb`; coverage is documented in `tests/README.md`. |
 | `macos/arm64/archive-release.sh` | Renamed from `archive.sh`; assembler helper that creates `.7z`, tests its extracted contents and writes the SHA-256 sidecar. |
 | `macos/arm64/extract-fmod.sh` | Unpacks an authorized FMOD installer without a system-wide installation. |
 | `.github/workflows/build-macos-arm64.yml` | Builds on ARM64 macOS 14, verifies the archive on fresh macOS 15/26 runners and uploads runtime artifacts. |
@@ -111,21 +110,7 @@ prints `mkmf.log` before CI removes the temporary SDK.
    reproduced the failure; simply loading the extension did not. Submit this
    upstream and replace the patch with a commit pin once merged. The Linux
    builder is not changed by this macOS patch.
-4. **SFEMovie texture ABI:** the pinned Ruby binding contains obsolete copied
-   LiteRGSS headers and calls the untyped Ruby Data API. Current LiteRGSS wraps
-   bitmaps in TypedData, so PSDK's `update_bitmap(Texture)` raises `TypeError`.
-   Both platform builders apply `patches/sfemovie-typed-texture.patch`. The patch
-   gets LiteRGSS's actual type descriptor from its Bitmap allocator and uses
-   `rb_check_typeddata`; a separately instantiated C++ descriptor would have a
-   different address across extension libraries. It checks disposed and
-   uninitialized native pointers, preserves the no-op for unrelated objects,
-   and constructs snapshots through Bitmap's initializer. The preparation
-   helper replaces the build copy's stale `LiteCGSS` directory with a link to
-   the pinned engine headers. `extconf.rb` receives the matching LiteRGSS
-   header directory through `--with-LiteRGSS-include`; these are build inputs
-   only and are never packaged.
-   No sibling developer checkout, upstream extconf or CMake file is edited.
-   Remove this patch once the corresponding upstream fix is pinned.
+4. **SFEMovie texture ABI:** upstream commit `5f42b7b3dabc641d73c6fe533f08d9d69e3e4377` includes the TypedData access, disposed-object checks, snapshot initialization and header configuration fixes. All platforms pin this commit; no local texture patch is needed. The preparation helper still links matching LiteCGSS headers, and builders supply the LiteRGSS include directory.
 
 Ruby configure options disable DTrace/JIT build dependencies and optional native
 dbm/gdbm/readline extensions; Ruby 3.4's Reline is still bundled. Font rendering
@@ -146,7 +131,7 @@ The movie regression reproduced `expected Data` with the previous macOS bundle
 and passed with the corrected Ruby 3.4.10 bundle. It compares exported texture
 pixels with a reference image, including a Bitmap subclass like PSDK's Texture.
 The earlier audio-only movie smoke did not exercise this interface. The shared
-patch is wired into Linux builds too, but its Linux execution still needs CI
+upstream fix is pinned for Linux builds too, but its Linux execution still needs CI
 validation; the graphical regression currently runs in macOS verification.
 
 The deployment target is a compatibility constraint, not proof of testing on

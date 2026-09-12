@@ -25,6 +25,7 @@ LOGIN_URL = "https://www.fmod.com/api-login"
 DOWNLOAD_LINK_URL = "https://www.fmod.com/api-get-download-link"
 
 PLATFORMS = {
+    "windows": ("Win", "win-installer.exe"),
     "linux": ("Linux", "linux.tar.gz"),
     "macos": ("Mac", "mac-installer.dmg"),
 }

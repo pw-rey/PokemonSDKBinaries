@@ -57,9 +57,10 @@ copy_licenses "$repository_root" psdk-build-tooling
 cp -p "$work_dir/src/freetype/docs/FTL.TXT" "$output_dir/licenses/freetype/"
 cp "$repository_root/config/macos-arm64.conf" "$output_dir/BUILD-INFO"
 printf '\nPATCH=sfemovie-channel-layout.patch\n' >> "$output_dir/BUILD-INFO"
-printf 'PATCH=sfemovie-typed-texture.patch\n' >> "$output_dir/BUILD-INFO"
 xcrun clang --version >> "$output_dir/BUILD-INFO"
 cp "$repository_root/config/macos-arm64-sources.lock" "$output_dir/source-archives.txt"
+mkdir -p "$output_dir/lib/psdk-runtime"
+cp "$repository_root/tests/runtime-functional.rb" "$repository_root/tests/sfemovie-texture.rb" "$output_dir/lib/psdk-runtime/"
 
 if [[ -n "$archive_path" ]]; then
   RELEASE_DIR="$output_dir" ARCHIVE_PATH="$archive_path" bash "$repository_root/macos/arm64/archive-release.sh"

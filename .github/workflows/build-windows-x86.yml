@@ -1,0 +1,94 @@
+name: Build Windows x86
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      FMOD_USER:
+        required: true
+      FMOD_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Bootstrap isolated checksum-pinned CI toolchain
+        run: ./windows/x86/bootstrap.ps1
+      - name: Fetch pinned source revisions
+        run: ./windows/x86/run.ps1 fetch
+      - name: Test the PE auditor and Windows layout contract
+        run: |
+          $env:MSYSTEM = 'MINGW32'
+          $env:CHERE_INVOKING = '1'
+          & ./generated/windows-x86/msys64/usr/bin/bash.exe -lc 'source windows/x86/env.sh; python windows/x86/test_pe.py && python windows/x86/test_layout.py'
+          if ($LASTEXITCODE) { throw 'PE auditor tests failed' }
+      - name: Download and extract the FMOD Windows installer
+        env:
+          FMOD_USER: ${{ secrets.FMOD_USER }}
+          FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
+        run: ./windows/x86/run.ps1 download-fmod
+      - name: Build 32-bit SFML, FFmpeg and subtitle dependencies
+        run: ./windows/x86/run.ps1 dependencies
+      - name: Build embedded 32-bit Ruby
+        run: ./windows/x86/run.ps1 ruby
+      - name: Build LiteCGSS, LiteRGSS and SFMLAudio
+        run: ./windows/x86/run.ps1 graphics
+      - name: Build native sfeMovie and Ruby SFEMovie
+        run: ./windows/x86/run.ps1 movie
+      - name: Build RubyFMOD
+        run: ./windows/x86/run.ps1 fmod
+      - name: Package Ruby executables, root runtime DLL and private DLL manifests
+        run: ./windows/x86/run.ps1 assemble
+      - name: Test both Ruby executables with gems enabled and disabled, then archive
+        run: ./windows/x86/run.ps1 verify
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Windows-x86
+          path: |
+            dist/Windows-x86.7z
+            dist/Windows-x86.7z.sha256
+          if-no-files-found: error
+      - name: Remove temporary FMOD SDK
+        if: ${{ always() }}
+        run: |
+          $workspace = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
+          foreach ($relative in @('generated/windows-x86/fmod-sdk', 'generated/windows-x86/fmod-download.exe')) {
+            $target = [IO.Path]::GetFullPath((Join-Path $workspace $relative))
+            if (!$target.StartsWith($workspace + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+              throw 'Cleanup target escaped workspace'
+            }
+            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+          }
+
+  verify:
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Windows-x86
+          path: dist
+      - name: Verify archive and legacy gems-disabled launch mode on a fresh runner
+        shell: pwsh
+        run: |
+          $expected = ((Get-Content dist/Windows-x86.7z.sha256 -Raw) -split '\s+')[0]
+          if ((Get-FileHash dist/Windows-x86.7z -Algorithm SHA256).Hash -ne $expected) { throw 'Archive checksum mismatch' }
+          New-Item -ItemType Directory -Force 'generated/relocated runtime' | Out-Null
+          & "$env:SystemRoot/System32/tar.exe" -xf dist/Windows-x86.7z -C 'generated/relocated runtime'
+          if ($LASTEXITCODE) { throw 'Archive extraction failed' }
+          ./windows/x86/verify-runtime.ps1 -Runtime 'generated/relocated runtime'

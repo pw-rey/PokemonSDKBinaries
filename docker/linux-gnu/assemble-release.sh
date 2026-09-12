@@ -192,7 +192,9 @@ printf 'Platform: %s\nRuby: %s\nFMOD API: %s\nFFmpeg: %s\nLiteRGSS revision: %s\
   "${PLATFORM}" "${RUBY_VERSION}" "${FMOD_VERSION_HEX}" "${FFMPEG_VERSION}" \
   "${LITERGSS_REF}" "${RUBY_FMOD_REF}" "${SFEMOVIE_REF}" \
   > "${output_dir}/BUILD-INFO"
-printf 'Patch: sfemovie-typed-texture.patch\n' >> "${output_dir}/BUILD-INFO"
+
+mkdir -p "${output_dir}/lib/psdk-runtime"
+cp "${repository_root}/tests/runtime-functional.rb" "${repository_root}/tests/sfemovie-texture.rb" "${output_dir}/lib/psdk-runtime/"
 
 if [[ -n "${archive_path}" ]]; then
   command -v 7z >/dev/null || {

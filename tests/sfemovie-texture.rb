@@ -13,6 +13,7 @@ def png_chunk(id, data)
 end
 
 Dir.mktmpdir('sfemovie-texture-') do |directory|
+  begin
   width = height = 16
   frames = 25
   pixels = [0, 255, 0].pack('C*') * width * height # BGR, aligned rows
@@ -70,6 +71,12 @@ Dir.mktmpdir('sfemovie-texture-') do |directory|
   raise 'Movie snapshot pixels differ' unless snapshot.to_png == expected
   snapshot.dispose
   reference.dispose
-  movie.stop
+  ensure
+    # stop only pauses the demuxer; Windows cannot unlink its open AVI file.
+    # Release the native Movie before Dir.mktmpdir removes the fixture.
+    movie&.stop
+    movie = nil
+    GC.start(full_mark: true, immediate_sweep: true)
+  end
 end
 puts 'SFEMovie texture transfer, snapshot, subclass and disposal checks passed.'

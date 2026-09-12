@@ -7,14 +7,16 @@ Prebuilt runtime packages for projects made with [Pokémon SDK](https://gitlab.c
 | Platform | Architecture | Status |
 | --- | --- | --- |
 | Linux | x86-64 | Available through tagged releases |
-| Windows | — | Planned |
+| Windows | x86 (32-bit) | CI build and local runtime validation |
 | macOS | ARM64 (Apple Silicon) | CI targets macOS 11.0 and later |
 
 The Linux package is built for a **glibc 2.28** baseline. It has been validated on Ubuntu and Fedora-family distributions. The runtime expects a typical desktop graphics and audio stack: the system OpenGL driver, X11/XWayland libraries, and an ALSA-compatible audio stack.
 
+Windows build instructions and validation: [windows/x86/README.md](windows/x86/README.md).
+
 ## Download and use
 
-Download `Linux-x86-64.7z` or `MacOS-arm64.7z` from the [latest release](../../releases/latest), then extract it. Each archive contains one top-level directory named `ruby-dist/`:
+Download `Linux-x86-64.7z`, `MacOS-arm64.7z` or `Windows-x86.7z` from the [latest release](../../releases/latest), then extract it. The Linux and macOS archives contain one top-level directory named `ruby-dist/`:
 
 ```text
 ruby-dist/
@@ -31,6 +33,8 @@ source /path/to/ruby-dist/setup.sh
 ```
 
 `setup.sh` configures the bundled Ruby, native-library search path, and Ruby load path for the current shell. `BUILD-INFO` records the component revisions used for that package.
+
+The Windows archive contains `lib/` and `ruby_builtin_dlls/` directly, alongside the bundled `ruby.exe`, `rubyw.exe` and `msvcrt-ruby340.dll`. Extract them together into your application directory. Its DLL assembly manifest is generated from the packaged dependencies; see the [Windows documentation](windows/x86/README.md).
 
 ## Included Linux runtime
 
@@ -58,7 +62,8 @@ The workflow checks out immutable component revisions, builds the runtime in a `
 Normal branch pushes and pull requests do not run the release workflow.
 
 The same protected tag builds `MacOS-arm64.7z` with Ruby **3.4.10** on Apple
-Silicon. Both platforms must pass their checks before publication. See the
+Silicon, and `Windows-x86.7z` for 32-bit Windows. All three platforms must pass
+their checks before publication. See the
 [macOS build documentation](macos/arm64/README.md) for local commands, the purpose
 of each new file, upstream adjustments and compatibility-testing limits.
 
