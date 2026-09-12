@@ -1,10 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Runtime)
 $ErrorActionPreference = 'Stop'
 $runtimePath = (Resolve-Path -LiteralPath $Runtime).Path
-$expected = 'lib,msvcrt-ruby340.dll,ruby.exe,ruby_builtin_dlls,rubyw.exe'
-if (((Get-ChildItem -LiteralPath $runtimePath | Sort-Object Name).Name -join ',') -ne $expected) {
-    throw 'Expected lib/, ruby_builtin_dlls/, ruby.exe, rubyw.exe and msvcrt-ruby340.dll'
-}
+& "$PSScriptRoot/assert-runtime-layout.ps1" -Runtime $runtimePath
 $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
 # The root-level Ruby DLL locates its standard library itself. Only the PSDK
 # extension directory needs adding; no host Ruby or gem directories are used.
