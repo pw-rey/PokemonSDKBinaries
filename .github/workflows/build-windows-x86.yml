@@ -24,6 +24,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Bootstrap isolated checksum-pinned CI toolchain
+        timeout-minutes: 30
         run: ./windows/x86/bootstrap.ps1
       - name: Fetch pinned source revisions
         run: ./windows/x86/run.ps1 fetch

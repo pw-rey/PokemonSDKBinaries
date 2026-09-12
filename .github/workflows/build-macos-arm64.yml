@@ -42,7 +42,25 @@ jobs:
       - name: Build embedded Ruby
         run: bash macos/arm64/build.sh ruby
       - name: Build LiteRGSS, RubyFMOD, SFMLAudio and SFEMovie
-        run: bash macos/arm64/build.sh components
+        run: |
+          mkdir -p generated/logs
+          set +e
+          bash macos/arm64/build.sh components 2>&1 | tee generated/logs/macos-components.log
+          build_status=${PIPESTATUS[0]}
+          set -e
+          if (( build_status != 0 )); then
+            echo '::group::Compiler error summary'
+            grep -n -B 4 -A 8 -E 'fatal error:|error:|Undefined symbols|ld: ' generated/logs/macos-components.log || true
+            echo '::endgroup::'
+          fi
+          exit "$build_status"
+      - name: Preserve component compiler log
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-component-diagnostics
+          path: generated/logs/macos-components.log
+          if-no-files-found: ignore
       - name: Assemble MacOS-arm64.7z
         run: |
           OUTPUT_DIR="$GITHUB_WORKSPACE/generated/MacOS-arm64/ruby-dist" \

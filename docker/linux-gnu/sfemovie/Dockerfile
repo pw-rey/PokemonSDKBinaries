@@ -35,6 +35,7 @@ RUN curl -fsSL "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" -o 
 
 COPY docker/linux-gnu/sfemovie/entrypoint.sh /usr/local/bin/sfemovie-entrypoint.sh
 COPY docker/linux-gnu/sfemovie/quiet-attached-pictures.patch /opt/sfemovie/quiet-attached-pictures.patch
+COPY macos/arm64/sfemovie-channel-layout.patch /opt/sfemovie/sfemovie-channel-layout.patch
 RUN chmod +x /usr/local/bin/sfemovie-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/sfemovie-entrypoint.sh"]

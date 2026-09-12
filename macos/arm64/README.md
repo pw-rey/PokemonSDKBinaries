@@ -108,8 +108,8 @@ prints `mkmf.log` before CI removes the temporary SDK.
    writes to the wrong fields and corrupts the resampler configuration. The
    patch changes the names to `in_chlayout`/`out_chlayout`. Actual audio loading
    reproduced the failure; simply loading the extension did not. Submit this
-   upstream and replace the patch with a commit pin once merged. The Linux
-   builder is not changed by this macOS patch.
+   upstream and replace the patch with a commit pin once merged. Linux CI
+   reproduced the same failure; all three platform builders apply this patch.
 4. **SFEMovie texture ABI:** upstream commit `5f42b7b3dabc641d73c6fe533f08d9d69e3e4377` includes the TypedData access, disposed-object checks, snapshot initialization and header configuration fixes. All platforms pin this commit; no local texture patch is needed. The preparation helper still links matching LiteCGSS headers, and builders supply the LiteRGSS include directory.
 
 Ruby configure options disable DTrace/JIT build dependencies and optional native
