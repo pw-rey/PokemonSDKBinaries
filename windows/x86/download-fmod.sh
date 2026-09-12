@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 source "$(dirname "$0")/env.sh"
-python "$ROOT/.github/scripts/download_fmod.py" --version "$FMOD_DOWNLOAD_VERSION" \
+python -u "$ROOT/.github/scripts/download_fmod.py" --version "$FMOD_DOWNLOAD_VERSION" \
   --platform windows --output "$WORK/fmod-download.exe"
 mkdir -p "$WORK/fmod-sdk"
 # FMOD distributes a Windows installer, not a zip. 7-Zip extracts the NSIS

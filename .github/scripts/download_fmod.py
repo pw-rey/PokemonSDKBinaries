@@ -25,7 +25,7 @@ LOGIN_URL = "https://www.fmod.com/api-login"
 DOWNLOAD_LINK_URL = "https://www.fmod.com/api-get-download-link"
 
 PLATFORMS = {
-    "windows": ("Win", "win-installer.exe"),
+    "windows": ("Windows", "win-installer.exe"),
     "linux": ("Linux", "linux.tar.gz"),
     "macos": ("Mac", "mac-installer.dmg"),
 }
@@ -200,6 +200,7 @@ def main() -> int:
 
     platform_directory, filename_suffix = PLATFORMS[args.platform]
     filename = f"fmodstudioapi{args.version}{filename_suffix}"
+    print(f"Requested FMOD SDK: {filename} (platform directory: {platform_directory})", flush=True)
 
     try:
         token = authenticate(user, password)
