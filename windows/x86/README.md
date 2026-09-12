@@ -44,8 +44,13 @@ must match their actual PE imports; do not rename them to obsolete names.
 
 Use a 64-bit Windows 10/11 or Server 2022 host and a checkout path without
 spaces. No host Ruby, compiler, Python, CMake or native dependencies are used.
-Windows PowerShell, curl.exe and tar.exe bootstrap a private, checksum-pinned
-MSYS2 environment under `generated/windows-x86`.
+Windows PowerShell and curl.exe bootstrap a private, checksum-pinned
+MSYS2 environment under `generated/windows-x86`. Bootstrap downloads pinned
+standalone 7-Zip 26.03 tools and extracts XZ and TAR in separate bounded stages;
+it does not use Windows tar or a preinstalled 7-Zip for this operation.
+Each stage reports progress and saves `extract-msys2.*.log` diagnostics, which
+CI uploads on failure. An extraction completion marker prevents a partial
+extraction from being mistaken for a usable toolchain.
 
 Run from the repository root in PowerShell:
 

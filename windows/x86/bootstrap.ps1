@@ -22,29 +22,42 @@ if (!(Test-Path -LiteralPath $extractionMarker)) {
     if (Test-Path -LiteralPath "$work/msys64") {
         throw 'MSYS2 directory exists without a completed extraction marker; use a fresh generated/windows-x86 directory.'
     }
-    Write-Host "[$(Get-Date -Format o)] Extracting MSYS2"
-    # Do not restore Unix ownership/permissions on the Windows runner.
-    # Keep diagnostics on disk and report liveness while extracting.
-    $extract = Start-Process -FilePath "$env:SystemRoot/System32/tar.exe" `
-        -ArgumentList @('--no-same-owner', '--no-same-permissions', '-xvf', "`"$work/downloads/msys2.tar.xz`"", '-C', "`"$work`"") `
-        -WindowStyle Hidden -PassThru -RedirectStandardOutput "$work/extract-msys2.out.log" -RedirectStandardError "$work/extract-msys2.err.log"
-    # Cache the process handle before waiting so Windows PowerShell 5.1 keeps
-    # the native exit code available after the process exits.
-    $null = $extract.Handle
-    $timer = [Diagnostics.Stopwatch]::StartNew()
-    while (!$extract.WaitForExit(15000)) {
-        Write-Host "[$(Get-Date -Format o)] MSYS2 extraction running ($([int]$timer.Elapsed.TotalSeconds)s)"
-        Get-Content "$work/extract-msys2.err.log" -Tail 2
-        if ($timer.Elapsed.TotalMinutes -ge 5) {
-            $extract.Kill()
-            $extract.WaitForExit()
-            throw 'MSYS2 extraction exceeded five minutes; inspect extract-msys2.*.log.'
+    Fetch 'https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe' `
+        'ad4c82fadcbdf93c03b4fc440f300509c7d60c5c2f4d183e35d9d70d6957037d' "$work/downloads/7zr.exe"
+    Fetch 'https://github.com/ip7z/7zip/releases/download/26.03/7z2603-extra.7z' `
+        '191894e6acb3647ffb69ce630479ff318523b2e2b9890aa7f05c1127c2e59b8f' "$work/downloads/7z-extra.7z"
+    function Extract($Tool, $Archive, $Destination, $Stage) {
+        Write-Host "[$(Get-Date -Format o)] Extracting $Stage"
+        $outLog = "$work/extract-msys2.$Stage.out.log"
+        $errLog = "$work/extract-msys2.$Stage.err.log"
+        $process = Start-Process -FilePath $Tool `
+            -ArgumentList @('x', '-y', '-bb1', "`"$Archive`"", "`"-o$Destination`"") `
+            -WindowStyle Hidden -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+        $null = $process.Handle
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        while (!$process.WaitForExit(15000)) {
+            Write-Host "[$(Get-Date -Format o)] $Stage running ($([int]$timer.Elapsed.TotalSeconds)s)"
+            Get-Content $outLog -Tail 2
+            Get-Content $errLog -Tail 2
+            if ($timer.Elapsed.TotalMinutes -ge 5) {
+                $process.Kill()
+                $process.WaitForExit()
+                throw "$Stage exceeded five minutes; inspect extract-msys2.$Stage.*.log."
+            }
+        }
+        Get-Content $outLog -Tail 8
+        if ($process.ExitCode -ne 0) {
+            Get-Content $errLog -Tail 30
+            throw "$Stage failed: $($process.ExitCode)"
         }
     }
-    if ($extract.ExitCode -ne 0) {
-        Get-Content "$work/extract-msys2.err.log" -Tail 30
-        throw "MSYS2 extraction failed: $($extract.ExitCode)"
-    }
+    # Standalone tools are downloaded and checksum-pinned; never use the
+    # runner's installed 7-Zip or Windows tar for bootstrap extraction.
+    Extract "$work/downloads/7zr.exe" "$work/downloads/7z-extra.7z" "$work/extractor" '7zip'
+    $sevenZip = "$work/extractor/x64/7za.exe"
+    Extract $sevenZip "$work/downloads/msys2.tar.xz" "$work/downloads/unpacked" 'xz'
+    Extract $sevenZip "$work/downloads/unpacked/msys2.tar" $work 'tar'
+    if (!(Test-Path -LiteralPath "$work/msys64/usr/bin/bash.exe")) { throw 'Extracted MSYS2 shell is missing' }
     New-Item -ItemType File -Path $extractionMarker | Out-Null
     Write-Host "[$(Get-Date -Format o)] MSYS2 extraction complete"
 }
