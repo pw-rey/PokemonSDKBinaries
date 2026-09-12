@@ -28,6 +28,13 @@ jobs:
         run: ./windows/x86/bootstrap.ps1
       - name: Fetch pinned source revisions
         run: ./windows/x86/run.ps1 fetch
+      - name: Preserve bootstrap extraction diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-bootstrap-diagnostics
+          path: generated/windows-x86/extract-msys2.*.log
+          if-no-files-found: ignore
       - name: Test the PE auditor and Windows layout contract
         run: |
           $env:MSYSTEM = 'MINGW32'

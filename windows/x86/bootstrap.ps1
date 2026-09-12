@@ -17,10 +17,36 @@ function Fetch($Url, $Hash, $Destination) {
 }
 Fetch 'https://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-20250830.tar.xz' `
     '780d7546aa86b781e0ded37c7b8f71f1b8572219494fe88259d8d4b78752b2e2' "$work/downloads/msys2.tar.xz"
-if (!(Test-Path "$work/msys64/usr/bin/bash.exe")) {
+$extractionMarker = "$work/.msys2-extracted"
+if (!(Test-Path -LiteralPath $extractionMarker)) {
+    if (Test-Path -LiteralPath "$work/msys64") {
+        throw 'MSYS2 directory exists without a completed extraction marker; use a fresh generated/windows-x86 directory.'
+    }
     Write-Host "[$(Get-Date -Format o)] Extracting MSYS2"
-    & "$env:SystemRoot/System32/tar.exe" -xf "$work/downloads/msys2.tar.xz" -C $work
-    if ($LASTEXITCODE) { throw 'MSYS2 extraction failed' }
+    # Do not restore Unix ownership/permissions on the Windows runner.
+    # Keep diagnostics on disk and report liveness while extracting.
+    $extract = Start-Process -FilePath "$env:SystemRoot/System32/tar.exe" `
+        -ArgumentList @('--no-same-owner', '--no-same-permissions', '-xvf', "`"$work/downloads/msys2.tar.xz`"", '-C', "`"$work`"") `
+        -WindowStyle Hidden -PassThru -RedirectStandardOutput "$work/extract-msys2.out.log" -RedirectStandardError "$work/extract-msys2.err.log"
+    # Cache the process handle before waiting so Windows PowerShell 5.1 keeps
+    # the native exit code available after the process exits.
+    $null = $extract.Handle
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while (!$extract.WaitForExit(15000)) {
+        Write-Host "[$(Get-Date -Format o)] MSYS2 extraction running ($([int]$timer.Elapsed.TotalSeconds)s)"
+        Get-Content "$work/extract-msys2.err.log" -Tail 2
+        if ($timer.Elapsed.TotalMinutes -ge 5) {
+            $extract.Kill()
+            $extract.WaitForExit()
+            throw 'MSYS2 extraction exceeded five minutes; inspect extract-msys2.*.log.'
+        }
+    }
+    if ($extract.ExitCode -ne 0) {
+        Get-Content "$work/extract-msys2.err.log" -Tail 30
+        throw "MSYS2 extraction failed: $($extract.ExitCode)"
+    }
+    New-Item -ItemType File -Path $extractionMarker | Out-Null
+    Write-Host "[$(Get-Date -Format o)] MSYS2 extraction complete"
 }
 Fetch 'https://github.com/oneclick/rubyinstaller2/releases/download/RubyInstaller-3.4.10-1/rubyinstaller-3.4.10-1-x86.7z' `
     'be323ac7b8342de16edcceb1ee04a90023c39aa7e7a544e628c6360fffb602da' "$work/downloads/rubyinstaller.7z"
