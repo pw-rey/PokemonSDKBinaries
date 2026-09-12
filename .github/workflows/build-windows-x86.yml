@@ -96,7 +96,5 @@ jobs:
         run: |
           $expected = ((Get-Content dist/Windows-x86.7z.sha256 -Raw) -split '\s+')[0]
           if ((Get-FileHash dist/Windows-x86.7z -Algorithm SHA256).Hash -ne $expected) { throw 'Archive checksum mismatch' }
-          New-Item -ItemType Directory -Force 'generated/relocated runtime' | Out-Null
-          & "$env:SystemRoot/System32/tar.exe" -xf dist/Windows-x86.7z -C 'generated/relocated runtime'
-          if ($LASTEXITCODE) { throw 'Archive extraction failed' }
+          ./windows/x86/extract-release.ps1 -Archive dist/Windows-x86.7z -Destination 'generated/relocated runtime'
           ./windows/x86/verify-runtime.ps1 -Runtime 'generated/relocated runtime'
