@@ -67,9 +67,10 @@ jobs:
           test -s dist/Linux-x86-64.7z
           test -s dist/MacOS-arm64.7z
           test -s dist/Windows-x86.7z
+          (cd dist; sha256sum -c Linux-x86-64.7z.sha256)
           (cd dist; sha256sum -c Windows-x86.7z.sha256)
           (cd dist; sha256sum -c MacOS-arm64.7z.sha256)
-          assets=(dist/Linux-x86-64.7z dist/MacOS-arm64.7z dist/MacOS-arm64.7z.sha256 dist/Windows-x86.7z dist/Windows-x86.7z.sha256)
+          assets=(dist/Linux-x86-64.7z dist/Linux-x86-64.7z.sha256 dist/MacOS-arm64.7z dist/MacOS-arm64.7z.sha256 dist/Windows-x86.7z dist/Windows-x86.7z.sha256)
           if [[ "${RELEASE_DRY_RUN:-}" == "true" ]]; then
             echo "Dry run: would publish Linux, macOS and Windows runtimes to release ${RELEASE_TAG}."
             sha256sum "${assets[@]}"

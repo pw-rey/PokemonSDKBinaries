@@ -65,6 +65,11 @@ git push origin v1.0.0
 
 The workflow checks out immutable component revisions, builds the runtime in a `manylinux_2_28` environment, assembles `Linux-x86-64.7z`, and smoke-tests the completed payload in a separate glibc 2.28 container before publishing it.
 
+Like macOS and Windows, Linux also has a separate `verify` job on a fresh runner.
+It downloads the archive and SHA-256 sidecar, checks the checksum, extracts the
+archive, and runs the existing glibc 2.28 functional checks. Publication waits
+for both the build and verification jobs to succeed.
+
 Normal branch pushes and pull requests do not run the release workflow.
 
 The same protected tag builds `MacOS-arm64.7z` with Ruby **3.4.10** on Apple
@@ -80,7 +85,6 @@ The workflow is the supported release path. For local CI-style testing, install 
 ```bash
 act workflow_call \
   -W .github/workflows/build-linux-x86_64.yml \
-  -j build \
   -e ../.act/tag-push.json \
   -P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04 \
   --bind \
@@ -89,6 +93,10 @@ act workflow_call \
 ```
 
 `--bind` is required for this workflow because Docker build containers need access to component source directories created by `act`. Artifacts created by `act` are local test output; GitHub Releases are published only by GitHub Actions.
+
+The command runs both `build` and `verify`. Local runs skip artifact upload and
+download, passing the archive through the shared `dist/` directory. Add `-j build`
+only when you want to omit the separate archive verification job.
 
 To exercise publication in a local run of `release.yml` without creating or
 changing a GitHub Release, add:
