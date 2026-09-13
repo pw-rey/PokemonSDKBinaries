@@ -44,9 +44,15 @@ The Linux x86-64 package contains:
 - Embedded Ruby
 - SFML and SFMLAudio
 - RubyFMOD and FMOD Core 2.02
-- sfeMovie, FFmpeg 6.0, and the `SFEMovie` Ruby binding
+- sfeMovie, FFmpeg 6.1.6, and the `SFEMovie` Ruby binding
 
 FFmpeg includes the `png` and `mov_text` decoders required by the SDK's movie support. Graphics drivers, X11 integration, ALSA, and the system C++ runtime remain host-provided so they can match the target distribution and desktop driver stack.
+
+Linux source dependencies are pinned by URL and SHA-256 in
+[config/linux-x86_64-sources.lock](config/linux-x86_64-sources.lock), using the
+same format and archive fetcher as macOS. The repository-owned Linux Docker
+builders consume these archives. See [Linux dependency notes](docker/linux-gnu/DEPENDENCIES.md)
+for selected versions, compatibility constraints, and distribution packages.
 
 ## Releases
 

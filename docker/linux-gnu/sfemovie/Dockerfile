@@ -1,21 +1,21 @@
 ARG LITERGSS_IMAGE=litergss-linux-gnu:3.4.10
 FROM ${LITERGSS_IMAGE}
 
-ARG FFMPEG_VERSION=6.0
-ARG FFMPEG_SHA256=57be87c22d9b49c112b6d24bc67d42508660e6b718b3db89c44e47e289137082
+ARG FFMPEG_VERSION
 
-RUN dnf install -y --setopt=install_weak_deps=False \
-      xz \
-      libass-devel harfbuzz-devel fribidi-devel fontconfig-devel \
- && dnf clean all
+# Font/subtitle dependencies are already built from the Linux lock in the base.
+COPY config/linux-x86_64-sources.lock /opt/psdk/sources.lock
+COPY sources/archives/ffmpeg.tar.xz /opt/psdk/archives/ffmpeg.tar.xz
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-RUN curl -fsSL "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" -o /tmp/ffmpeg.tar.xz \
- && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.tar.xz" | sha256sum -c - \
- && mkdir /tmp/ffmpeg \
- && tar -xJf /tmp/ffmpeg.tar.xz --strip-components=1 -C /tmp/ffmpeg \
- && cd /tmp/ffmpeg \
+RUN source /opt/psdk/locked-source.sh \
+ && test "$(awk '$1 == "ffmpeg" {print $3}' /opt/psdk/sources.lock)" = "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" \
+ && extract_source ffmpeg \
+ && cd /tmp/psdk-src/ffmpeg \
  && CC=/usr/bin/gcc CXX=/usr/bin/g++ ./configure \
       --prefix=/opt/sfemovie/ffmpeg \
+      --extra-cflags=-I/opt/psdk/deps/include \
+      --extra-ldflags=-L/opt/psdk/deps/lib \
       --enable-shared \
       --disable-static \
       --disable-programs \
@@ -31,7 +31,7 @@ RUN curl -fsSL "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" -o 
       --enable-decoder=movtext \
  && make -j"$(nproc)" \
  && make install \
- && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
+ && rm -rf /tmp/psdk-src/ffmpeg /opt/psdk/archives
 
 COPY docker/linux-gnu/sfemovie/entrypoint.sh /usr/local/bin/sfemovie-entrypoint.sh
 COPY docker/linux-gnu/sfemovie/quiet-attached-pictures.patch /opt/sfemovie/quiet-attached-pictures.patch

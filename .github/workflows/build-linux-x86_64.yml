@@ -58,7 +58,7 @@ jobs:
           RUBY_VERSION="$RUBY_VERSION" \
           RUBY_SHA256="$RUBY_SHA256" \
           OUTPUT_DIR="$GITHUB_WORKSPACE/generated/litergss" \
-          sources/litergss/docker/linux-gnu/build.sh
+          bash docker/linux-gnu/litergss/build.sh
 
       - name: Build RubyFMOD and FMOD runtime
         run: |
@@ -68,7 +68,7 @@ jobs:
           OUTPUT_DIR="$GITHUB_WORKSPACE/generated/rubyfmod" \
           docker/linux-gnu/rubyfmod/build.sh
 
-      - name: Build sfeMovie and FFmpeg 6.0 runtime
+      - name: Build sfeMovie and locked FFmpeg runtime
         run: |
           RUBY_VERSION="$RUBY_VERSION" \
           SOURCE_DIR="$GITHUB_WORKSPACE/sources/sfemovie" \
@@ -100,6 +100,8 @@ jobs:
         run: RELEASE_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" docker/linux-gnu/verify-release.sh
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        # act --bind leaves the archive in dist/ without an artifact server.
+        if: ${{ !env.ACT }}
         with:
           name: Linux-x86-64
           path: dist/Linux-x86-64.7z
