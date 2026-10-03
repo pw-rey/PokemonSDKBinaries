@@ -48,8 +48,9 @@ Use the existing naming conventions consistently:
 | Configuration | `config/linux-x86_64.conf` | `config/<os>-<architecture>.conf` |
 | Source lock | `config/linux-x86_64-sources.lock` | Adjacent to the configuration |
 | Reusable workflow | `.github/workflows/build-linux-x86_64.yml` | `build-<os>-<architecture>.yml` |
-| Artifact and archive | `Linux-x86-64`, `MacOS-arm64`, `Windows-x86` | A unique OS/architecture name and matching `.7z` filename |
-| Release manifest key | `linux-x86-64`, `macos-arm64`, `windows-x86` | The artifact name lowercased |
+| Internal CI artifact | `Linux-x86-64`, `MacOS-arm64`, `Windows-x86` | A unique OS/architecture name |
+| Public archive | `Linux.7z`, `macOS.7z`, `Windows.7z` | The public OS name with a `.7z` extension |
+| Release manifest key | `linux`, `macos`, `windows` | The public archive name lowercased, without `.7z` |
 
 Directory/configuration names and public archive names use the existing spellings
 shown above; do not rename established targets as part of adding a port.
@@ -168,13 +169,17 @@ Release integration currently requires explicit updates in several places:
 - Add the target to the final publication job's `needs`, so its build and fresh
   verification both gate the release.
 - Download its artifact into `dist/` and check the archive and SHA-256 sidecar.
-- Add its public archive name to the `version.json` generation loop and the
+- Add its public archive basename (without `.7z`) to the `version.json` generation loop and the
   archive to the publication `assets` array.
 - Keep dry-run output accurate and include the target in documentation.
 
 The release publishes runtime archives and one `version.json`. Its `version`
-is the tag with the leading `v` removed; each lowercased OS/architecture key
-contains the SHA-1 of the corresponding final `.7z` bytes. Generate it only after
+is the tag with the leading `v` removed; each lowercased OS key
+contains the SHA-1 of the corresponding final `.7z` bytes. These are legacy OS
+keys (`linux`, `macos`, `windows`), without architecture suffixes. If adding a
+second architecture for an existing OS, agree on its public archive name and
+manifest key with maintainers and consuming launchers so packages cannot collide;
+preserve existing public names and keys. Generate the manifest only after
 all archive checks pass. SHA-256 sidecars stay internal to CI. Preserve both
 release creation and existing-release upload behavior and the
 `RELEASE_DRY_RUN=true` path; do not introduce release cleanup or migration steps.

@@ -88,16 +88,16 @@ jobs:
           OUTPUT_DIR="$GITHUB_WORKSPACE/generated/sfemovie-ruby" \
           linux/x86_64/sfemovie-ruby/build.sh
 
-      - name: Assemble Linux-x86-64.7z
+      - name: Assemble Linux.7z
         run: |
           LITERGSS_DIR="$GITHUB_WORKSPACE/generated/litergss" \
           RUBY_FMOD_DIR="$GITHUB_WORKSPACE/generated/rubyfmod" \
           SFEMOVIE_DIR="$GITHUB_WORKSPACE/generated/sfemovie" \
           SFEMOVIE_RUBY_DIR="$GITHUB_WORKSPACE/generated/sfemovie-ruby" \
           OUTPUT_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" \
-          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/Linux-x86-64.7z" \
+          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/Linux.7z" \
           linux/x86_64/assemble-release.sh
-          (cd dist; sha256sum Linux-x86-64.7z > Linux-x86-64.7z.sha256)
+          (cd dist; sha256sum Linux.7z > Linux.7z.sha256)
 
       - name: Smoke test the assembled payload on glibc 2.28
         run: RELEASE_DIR="$GITHUB_WORKSPACE/generated/Linux-x86-64" linux/x86_64/verify-release.sh
@@ -108,8 +108,8 @@ jobs:
         with:
           name: Linux-x86-64
           path: |
-            dist/Linux-x86-64.7z
-            dist/Linux-x86-64.7z.sha256
+            dist/Linux.7z
+            dist/Linux.7z.sha256
           if-no-files-found: error
 
       - name: Remove temporary FMOD SDK
@@ -137,10 +137,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes p7zip-full
       - name: Verify archive on a fresh runner using glibc 2.28
         run: |
-          (cd dist; sha256sum -c Linux-x86-64.7z.sha256)
+          (cd dist; sha256sum -c Linux.7z.sha256)
           mkdir -p generated
           # Keep nested Docker bind mounts under the shared workspace for act.
           verify_dir="$(mktemp -d "$GITHUB_WORKSPACE/generated/linux-verify.XXXXXX")"
           trap 'rm -rf "$verify_dir"' EXIT
-          7z x dist/Linux-x86-64.7z -o"$verify_dir"
+          7z x dist/Linux.7z -o"$verify_dir"
           RELEASE_DIR="$verify_dir/ruby-dist" bash linux/x86_64/verify-release.sh

@@ -82,12 +82,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          test -s dist/Linux-x86-64.7z
-          test -s dist/MacOS-arm64.7z
-          test -s dist/Windows-x86.7z
-          (cd dist; sha256sum -c Linux-x86-64.7z.sha256)
-          (cd dist; sha256sum -c Windows-x86.7z.sha256)
-          (cd dist; sha256sum -c MacOS-arm64.7z.sha256)
+          test -s dist/Linux.7z
+          test -s dist/macOS.7z
+          test -s dist/Windows.7z
+          (cd dist; sha256sum -c Linux.7z.sha256)
+          (cd dist; sha256sum -c Windows.7z.sha256)
+          (cd dist; sha256sum -c macOS.7z.sha256)
           # Publish legacy SHA-1 metadata; SHA-256 sidecars stay internal to CI.
           python3 - <<'PY'
           import hashlib
@@ -97,7 +97,7 @@ jobs:
 
           dist = Path("dist")
           manifest = {"version": os.environ["RELEASE_TAG"].removeprefix("v")}
-          for platform in ("Linux-x86-64", "MacOS-arm64", "Windows-x86"):
+          for platform in ("Linux", "macOS", "Windows"):
               digest = hashlib.sha1()
               with (dist / f"{platform}.7z").open("rb") as archive:
                   for chunk in iter(lambda: archive.read(1024 * 1024), b""):
@@ -107,7 +107,7 @@ jobs:
               json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
           )
           PY
-          assets=(dist/Linux-x86-64.7z dist/MacOS-arm64.7z dist/Windows-x86.7z dist/version.json)
+          assets=(dist/Linux.7z dist/macOS.7z dist/Windows.7z dist/version.json)
           if [[ "${RELEASE_DRY_RUN:-}" == "true" ]]; then
             echo "Dry run: would publish Linux, macOS and Windows runtimes to release ${RELEASE_TAG}."
             cat dist/version.json

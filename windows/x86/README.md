@@ -73,7 +73,7 @@ $env:FMOD_SDK_DIR = 'D:/path/to/FMod-Core'
 compiled against the proprietary SDK's supplied library.
 
 The payload is `generated/windows-x86/Windows-x86/`. Verification creates
-`dist/Windows-x86.7z` and its SHA-256 checksum. To test a payload directly:
+`dist/Windows.7z` and its SHA-256 checksum. To test a payload directly:
 
 ```powershell
 ./windows/x86/verify-runtime.ps1 -Runtime generated/windows-x86/Windows-x86

@@ -7,7 +7,7 @@ libiconv, libffi and zlib remain system-provided. Other dependencies are built
 from pinned sources, except FMOD's official runtime (its ARM64 slice also
 targets macOS 11.0).
 
-`dist/MacOS-arm64.7z` contains `ruby-dist/`. Like the legacy package it provides
+`dist/macOS.7z` contains `ruby-dist/`. Like the legacy package it provides
 `bin/ruby`, `lib/LiteRGSS.bundle`, `lib/RubyFmod.bundle`, and sourceable `setup.sh`.
 It additionally includes `SFMLAudio.bundle`, `SFEMovie.bundle`, FFmpeg 6.0 and
 subtitle support. Native extensions for legacy Ruby 3.2 must be rebuilt for 3.4.
@@ -33,7 +33,7 @@ export SEVENZIP="$PSDK_BUILD_TOOLS_BIN/7zz"
 bash .github/scripts/fetch-sources.sh config/macos-arm64.conf
 export FMOD_SDK_DIR=/absolute/path/to/FMOD-core
 bash macos/arm64/build.sh
-ARCHIVE_PATH="$PWD/dist/MacOS-arm64.7z" bash macos/arm64/assemble-release.sh
+ARCHIVE_PATH="$PWD/dist/macOS.7z" bash macos/arm64/assemble-release.sh
 RELEASE_DIR="$PWD/generated/MacOS-arm64/ruby-dist" bash macos/arm64/verify-release.sh
 ```
 

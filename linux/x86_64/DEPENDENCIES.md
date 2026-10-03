@@ -70,6 +70,6 @@ bundle and respects an explicitly set `SSL_CERT_FILE`.
 
 The user ran the Linux workflow with `act`: assembly and the shared functional
 suite passed in the glibc 2.28 container. The coding agent ran no builds or tests.
-Local runs skip GitHub artifact upload and retain `dist/Linux-x86-64.7z`.
+Local runs skip GitHub artifact upload and retain `dist/Linux.7z`.
 Run the Linux `act workflow_call` command in the repository README to exercise
 the complete build and existing runtime checks.

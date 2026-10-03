@@ -10,6 +10,6 @@ cp -a "$OUT" "$RELOCATED"
 "$(cygpath -u "$SYSTEMROOT")/System32/WindowsPowerShell/v1.0/powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -m "$ROOT/windows/x86/verify-runtime.ps1")" -Runtime "$(cygpath -m "$RELOCATED")"
 python "$ROOT/windows/x86/layout.py" "$RELOCATED"
 mkdir -p "$ROOT/dist"
-[[ ! -e "$ROOT/dist/Windows-x86.7z" ]] || { echo 'Archive already exists; move it aside before archiving again' >&2; exit 1; }
-(cd "$OUT"; 7z a -t7z "$ROOT/dist/Windows-x86.7z" lib ruby_builtin_dlls ruby.exe rubyw.exe msvcrt-ruby340.dll)
-(cd "$ROOT/dist"; sha256sum Windows-x86.7z > Windows-x86.7z.sha256)
+[[ ! -e "$ROOT/dist/Windows.7z" ]] || { echo 'Archive already exists; move it aside before archiving again' >&2; exit 1; }
+(cd "$OUT"; 7z a -t7z "$ROOT/dist/Windows.7z" lib ruby_builtin_dlls ruby.exe rubyw.exe msvcrt-ruby340.dll)
+(cd "$ROOT/dist"; sha256sum Windows.7z > Windows.7z.sha256)

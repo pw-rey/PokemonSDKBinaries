@@ -63,8 +63,8 @@ jobs:
         with:
           name: Windows-x86
           path: |
-            dist/Windows-x86.7z
-            dist/Windows-x86.7z.sha256
+            dist/Windows.7z
+            dist/Windows.7z.sha256
           if-no-files-found: error
       - name: Remove temporary FMOD SDK
         if: ${{ always() }}
@@ -93,7 +93,7 @@ jobs:
       - name: Verify archive and legacy gems-disabled launch mode on a fresh runner
         shell: pwsh
         run: |
-          $expected = ((Get-Content dist/Windows-x86.7z.sha256 -Raw) -split '\s+')[0]
-          if ((Get-FileHash dist/Windows-x86.7z -Algorithm SHA256).Hash -ne $expected) { throw 'Archive checksum mismatch' }
-          ./windows/x86/extract-release.ps1 -Archive dist/Windows-x86.7z -Destination 'generated/relocated runtime'
+          $expected = ((Get-Content dist/Windows.7z.sha256 -Raw) -split '\s+')[0]
+          if ((Get-FileHash dist/Windows.7z -Algorithm SHA256).Hash -ne $expected) { throw 'Archive checksum mismatch' }
+          ./windows/x86/extract-release.ps1 -Archive dist/Windows.7z -Destination 'generated/relocated runtime'
           ./windows/x86/verify-runtime.ps1 -Runtime 'generated/relocated runtime'

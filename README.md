@@ -20,7 +20,7 @@ Build instructions and validation details: [Linux](linux/x86_64/DEPENDENCIES.md)
 
 ## Download and use
 
-Download `Linux-x86-64.7z`, `MacOS-arm64.7z` or `Windows-x86.7z` and `version.json` from the [latest release](../../releases/latest), verify the archive against its SHA-1 hash in the manifest, then extract it. The Linux and macOS archives contain one top-level directory named `ruby-dist/`:
+Download `Linux.7z`, `macOS.7z` or `Windows.7z` and `version.json` from the [latest release](../../releases/latest), verify the archive against its SHA-1 hash in the manifest, then extract it. The Linux and macOS archives contain one top-level directory named `ruby-dist/`:
 
 ```text
 ruby-dist/
@@ -67,7 +67,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The workflow checks out immutable component revisions, builds the runtime in a `manylinux_2_28` environment, assembles `Linux-x86-64.7z`, and smoke-tests the completed payload in a separate glibc 2.28 container before publishing it.
+The workflow checks out immutable component revisions, builds the runtime in a `manylinux_2_28` environment, assembles `Linux.7z`, and smoke-tests the completed payload in a separate glibc 2.28 container before publishing it.
 
 Like macOS and Windows, Linux also has a separate `verify` job on a fresh runner.
 It downloads the archive and SHA-256 sidecar, checks the checksum, extracts the
@@ -78,14 +78,14 @@ All three platforms run the same [runtime functional suite](tests/README.md), co
 
 The final publication job also generates `version.json`. It retains the legacy
 manifest format: `version` is the release tag without its leading `v`, and
-`linux-x86-64`, `macos-arm64` and `windows-x86` contain the SHA-1 hashes of their
+`linux`, `macos` and `windows` contain the SHA-1 hashes of their
 respective `.7z` archives. Only the archives and `version.json` are published.
 SHA-256 sidecars remain internal CI artifacts for verification.
 
 Normal branch pushes and pull requests do not run the release workflow.
 
-The same protected tag builds `MacOS-arm64.7z` with Ruby **3.4.10** on Apple
-Silicon, and `Windows-x86.7z` for 32-bit Windows. All three platforms must pass
+The same protected tag builds `macOS.7z` with Ruby **3.4.10** on Apple
+Silicon, and `Windows.7z` for 32-bit Windows. All three platforms must pass
 their checks before publication. See the
 [macOS build documentation](macos/arm64/README.md) for local commands, the purpose
 of each new file, upstream adjustments and compatibility-testing limits.

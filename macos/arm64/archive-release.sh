@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SEVENZIP="${SEVENZIP:-7zz}"
 RELEASE_DIR="${RELEASE_DIR:-$ROOT/generated/MacOS-arm64/ruby-dist}"
-archive="${ARCHIVE_PATH:-$ROOT/dist/MacOS-arm64.7z}"
+archive="${ARCHIVE_PATH:-$ROOT/dist/macOS.7z}"
 mkdir -p "$(dirname "$archive")"
 archive="$(cd "$(dirname "$archive")" && pwd)/$(basename "$archive")"
 temporary="$(mktemp -d)"

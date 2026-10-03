@@ -60,10 +60,10 @@ jobs:
           name: macos-component-diagnostics
           path: generated/logs/macos-components.log
           if-no-files-found: ignore
-      - name: Assemble MacOS-arm64.7z
+      - name: Assemble macOS.7z
         run: |
           OUTPUT_DIR="$GITHUB_WORKSPACE/generated/MacOS-arm64/ruby-dist" \
-          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/MacOS-arm64.7z" \
+          ARCHIVE_PATH="$GITHUB_WORKSPACE/dist/macOS.7z" \
           bash macos/arm64/assemble-release.sh
       - name: Smoke test the assembled payload
         run: RELEASE_DIR="$GITHUB_WORKSPACE/generated/MacOS-arm64/ruby-dist" bash macos/arm64/verify-release.sh
@@ -71,8 +71,8 @@ jobs:
         with:
           name: MacOS-arm64
           path: |
-            dist/MacOS-arm64.7z
-            dist/MacOS-arm64.7z.sha256
+            dist/macOS.7z
+            dist/macOS.7z.sha256
           if-no-files-found: error
       - name: Remove temporary FMOD SDK
         if: ${{ always() }}
@@ -98,7 +98,7 @@ jobs:
         run: |
           test "$(uname -m)" = arm64
           bash macos/arm64/bootstrap-tools.sh archive
-          (cd dist; shasum -a 256 -c MacOS-arm64.7z.sha256)
+          (cd dist; shasum -a 256 -c macOS.7z.sha256)
           mkdir -p generated/MacOS-arm64
-          "$PWD/generated/macos-arm64-tools/bin/7zz" x dist/MacOS-arm64.7z -ogenerated/MacOS-arm64
+          "$PWD/generated/macos-arm64-tools/bin/7zz" x dist/macOS.7z -ogenerated/MacOS-arm64
           bash macos/arm64/verify-release.sh
