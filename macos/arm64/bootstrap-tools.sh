@@ -12,7 +12,7 @@ export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 unset CPPFLAGS LDFLAGS CFLAGS CXXFLAGS CPATH LIBRARY_PATH PKG_CONFIG_PATH PKG_CONFIG_LIBDIR
 readonly lock="$root/config/macos-arm64-tools.lock"
 readonly work="$root/generated/macos-arm64-tools"
-readonly lock_digest="$(shasum -a 256 "$lock" | awk '{print $1}')"
+readonly lock_digest="$(cat "$lock" "$root/macos/arm64/bootstrap-tools.sh" | shasum -a 256 | awk '{print $1}')"
 readonly tools="$work/$lock_digest"
 readonly prefix="$tools/prefix"
 mkdir -p "$work/archives" "$prefix/bin"
@@ -40,9 +40,10 @@ if [[ ! -f "$tools/sevenzip-installed" ]]; then
   (
     cd "$tools/sevenzip/CPP/7zip/Bundles/Alone2"
     # Upstream's macOS binary requires macOS 26; build for all our CI runners.
+    # Keep Apple's default ARM features, including AES, as upstream does.
     MACOSX_DEPLOYMENT_TARGET=11.0 make -j"${JOBS:-$(sysctl -n hw.ncpu)}" \
       -f ../../cmpl_mac_arm64.mak DISABLE_RAR_COMPRESS=1 \
-      'MY_ARCH=-arch arm64 -march=armv8-a -mmacosx-version-min=11.0'
+      'MY_ARCH=-arch arm64 -mmacosx-version-min=11.0'
     install -m 0755 b/m_arm64/7zz "$prefix/bin/7zz"
   )
   touch "$tools/sevenzip-installed"
@@ -83,7 +84,7 @@ if [[ "$mode" == build ]]; then
   fi
 fi
 
-# A lock change selects a new installation rather than reusing old tool stamps.
+# Lock or bootstrap changes select a new installation instead of old tool stamps.
 ln -sfn "$prefix/bin" "$work/bin"
 if [[ -n "${GITHUB_PATH:-}" ]]; then
   printf '%s\n' "$work/bin" >> "$GITHUB_PATH"

@@ -43,8 +43,9 @@ The bootstrap uses fixed upstream downloads verified against
 CMake and Ninja use upstream macOS binaries. 7-Zip is built for macOS 11.0
 because the upstream 26.03 Mac binary requires macOS 26 and cannot run on the
 older CI runners. The tools live under `generated/macos-arm64-tools/` and
-are not shipped. Installations are keyed by the lock's SHA-256, so pin changes
-do not reuse old tool stamps. CI uses these tools rather than current Homebrew
+are not shipped. Installations are keyed by the lock and bootstrap script's
+SHA-256, so pin or build-recipe changes do not reuse old tool stamps.
+CI uses these tools rather than current Homebrew
 formulas. Local builds may still use installed `cmake`, `ninja`, `pkgconf` and
 `sevenzip` when `PSDK_BUILD_TOOLS_BIN` is unset.
 
