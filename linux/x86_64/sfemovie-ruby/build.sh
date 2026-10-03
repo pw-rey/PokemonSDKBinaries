@@ -33,4 +33,4 @@ docker run --rm --entrypoint /bin/bash \
   -v "${sfemovie_runtime_dir}:/sfemovie-runtime:ro" \
   -v "${output_dir}:/output" \
   "${image_name}" \
-  /config/docker/linux-gnu/sfemovie-ruby/entrypoint.sh
+  /config/linux/x86_64/sfemovie-ruby/entrypoint.sh

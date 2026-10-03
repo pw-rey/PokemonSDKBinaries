@@ -24,7 +24,7 @@ file "${fmod_library}" | grep -Fq 'ELF 64-bit LSB shared object, x86-64'
 
 cp -a /source/. "${source_dir}"
 cd "${source_dir}"
-patch -p1 < /config/docker/linux-gnu/rubyfmod/fmod-sdk.patch
+patch -p1 < /config/linux/x86_64/rubyfmod/fmod-sdk.patch
 
 export PATH="${ruby_dir}/bin:${PATH}"
 

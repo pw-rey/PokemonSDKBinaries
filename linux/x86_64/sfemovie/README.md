@@ -11,13 +11,13 @@ The shared source fetcher downloads it before the Docker build. Its
 configuration builds shared libraries without external autodetected
 dependencies or network support; this keeps the runtime closure predictable.
 
-Fetch sources and build LiteRGSS with `docker/linux-gnu/litergss/build.sh` first,
+Fetch sources and build LiteRGSS with `linux/x86_64/litergss/build.sh` first,
 then run from this repository (the Linux workflow performs these steps):
 
 ```sh
 RUBY_VERSION=3.4.10 \
 SOURCE_DIR=/path/to/sfeMovie \
-docker/linux-gnu/sfemovie/build.sh
+linux/x86_64/sfemovie/build.sh
 ```
 
 Set `OUTPUT_DIR` to choose an empty output directory. The result contains the

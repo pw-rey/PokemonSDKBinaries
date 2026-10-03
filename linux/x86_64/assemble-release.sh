@@ -147,7 +147,7 @@ done < <(
 ruby_library_dir="$(find "${output_dir}/lib/ruby" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*' -print -quit)"
 ruby_arch_library_dir="$(find "${ruby_library_dir}" -mindepth 1 -maxdepth 1 -type d -name '*-linux*' -print -quit)"
 test -n "${ruby_library_dir}" && test -n "${ruby_arch_library_dir}"
-install -m 0644 "${repository_root}/docker/linux-gnu/clean_load_path.rb" \
+install -m 0644 "${repository_root}/linux/x86_64/clean_load_path.rb" \
   "${ruby_library_dir}/clean_load_path.rb"
 
 LD_LIBRARY_PATH="${output_dir}/lib" "${output_dir}/bin/ruby" \

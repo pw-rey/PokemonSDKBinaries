@@ -15,19 +15,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authorize_release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require a protected release tag
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_REF_PROTECTED: ${{ github.ref_protected }}
+        run: |
+          if [[ "$RELEASE_EVENT" != push || "$RELEASE_REF" != refs/tags/v* || "$RELEASE_REF_PROTECTED" != true ]]; then
+            echo '::error::Releases require a protected v* tag push. Configure the repository tag ruleset before releasing.'
+            exit 1
+          fi
+
   linux_x86_64:
+    needs: authorize_release
     uses: ./.github/workflows/build-linux-x86_64.yml
     secrets:
       FMOD_USER: ${{ secrets.FMOD_USER }}
       FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
 
   macos_arm64:
+    needs: authorize_release
     uses: ./.github/workflows/build-macos-arm64.yml
     secrets:
       FMOD_USER: ${{ secrets.FMOD_USER }}
       FMOD_PASSWORD: ${{ secrets.FMOD_PASSWORD }}
 
   windows_x86:
+    needs: authorize_release
     uses: ./.github/workflows/build-windows-x86.yml
     secrets:
       FMOD_USER: ${{ secrets.FMOD_USER }}
@@ -70,10 +88,29 @@ jobs:
           (cd dist; sha256sum -c Linux-x86-64.7z.sha256)
           (cd dist; sha256sum -c Windows-x86.7z.sha256)
           (cd dist; sha256sum -c MacOS-arm64.7z.sha256)
-          assets=(dist/Linux-x86-64.7z dist/Linux-x86-64.7z.sha256 dist/MacOS-arm64.7z dist/MacOS-arm64.7z.sha256 dist/Windows-x86.7z dist/Windows-x86.7z.sha256)
+          # Publish legacy SHA-1 metadata; SHA-256 sidecars stay internal to CI.
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          dist = Path("dist")
+          manifest = {"version": os.environ["RELEASE_TAG"].removeprefix("v")}
+          for platform in ("Linux-x86-64", "MacOS-arm64", "Windows-x86"):
+              digest = hashlib.sha1()
+              with (dist / f"{platform}.7z").open("rb") as archive:
+                  for chunk in iter(lambda: archive.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              manifest[platform.lower()] = digest.hexdigest()
+          (dist / "version.json").write_text(
+              json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          assets=(dist/Linux-x86-64.7z dist/MacOS-arm64.7z dist/Windows-x86.7z dist/version.json)
           if [[ "${RELEASE_DRY_RUN:-}" == "true" ]]; then
             echo "Dry run: would publish Linux, macOS and Windows runtimes to release ${RELEASE_TAG}."
-            sha256sum "${assets[@]}"
+            cat dist/version.json
             exit 0
           fi
 

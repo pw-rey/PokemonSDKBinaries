@@ -29,7 +29,7 @@ fi
 docker build \
   --build-arg "LITERGSS_IMAGE=${litergss_image}" \
   --build-arg "FFMPEG_VERSION=${FFMPEG_VERSION}" \
-  -f "${repository_root}/docker/linux-gnu/sfemovie/Dockerfile" \
+  -f "${repository_root}/linux/x86_64/sfemovie/Dockerfile" \
   -t "${image_name}" \
   "${repository_root}"
 

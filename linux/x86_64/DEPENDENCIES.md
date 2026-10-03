@@ -50,8 +50,9 @@ The manylinux base remains pinned by digest and retains glibc 2.28. The builder
 runs `dnf upgrade --refresh` before installing build tools and system integration
 headers. Fontconfig and its system configuration, Expat, JPEG, and ancillary
 distribution libraries follow AlmaLinux's maintained packages, rather than
-independent upstream source releases. Build tools and Ruby build gems also remain
-outside the runtime source lock. This is not a complete RPM/toolchain lock or a
+independent upstream source releases. Distribution build tools remain outside
+the runtime source lock; Ruby build gems are pinned separately as `RAKE_VERSION`
+and `RAKE_COMPILER_VERSION` in `config/linux-x86_64.conf`. This is not a complete RPM/toolchain lock or a
 claim of bit-for-bit reproducibility.
 
 A source-lock change invalidates the package-update Docker layer. To refresh

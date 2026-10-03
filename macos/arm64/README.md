@@ -24,16 +24,32 @@ No `DYLD_LIBRARY_PATH` is needed. The legacy `clean_load_path` require remains.
 
 ## Local build
 
-Use an Apple Silicon Mac with Xcode or Command Line Tools. Install build tools
-`cmake`, `ninja`, `pkgconf` and `sevenzip`; they are not shipped. From the repo:
+Use an Apple Silicon Mac with Xcode or Command Line Tools. From the repo:
 
 ```bash
+bash macos/arm64/bootstrap-tools.sh
+export PSDK_BUILD_TOOLS_BIN="$PWD/generated/macos-arm64-tools/bin"
+export SEVENZIP="$PSDK_BUILD_TOOLS_BIN/7zz"
 bash .github/scripts/fetch-sources.sh config/macos-arm64.conf
 export FMOD_SDK_DIR=/absolute/path/to/FMOD-core
 bash macos/arm64/build.sh
 ARCHIVE_PATH="$PWD/dist/MacOS-arm64.7z" bash macos/arm64/assemble-release.sh
 RELEASE_DIR="$PWD/generated/MacOS-arm64/ruby-dist" bash macos/arm64/verify-release.sh
 ```
+
+The bootstrap uses fixed upstream downloads verified against
+`config/macos-arm64-tools.lock`: CMake 4.4.4, Ninja 1.13.2, pkgconf 3.0.7 and
+7-Zip 26.03. pkgconf and 7-Zip are built from source using Apple's compiler;
+CMake and Ninja use upstream macOS binaries. 7-Zip is built for macOS 11.0
+because the upstream 26.03 Mac binary requires macOS 26 and cannot run on the
+older CI runners. The tools live under `generated/macos-arm64-tools/` and
+are not shipped. Installations are keyed by the lock's SHA-256, so pin changes
+do not reuse old tool stamps. CI uses these tools rather than current Homebrew
+formulas. Local builds may still use installed `cmake`, `ninja`, `pkgconf` and
+`sevenzip` when `PSDK_BUILD_TOOLS_BIN` is unset.
+
+Fresh verification runners use `bootstrap-tools.sh archive` to build only the
+pinned extractor with Apple's tools, without CMake, Ninja or pkgconf.
 
 `FMOD_SDK_DIR` must contain `inc/fmod_common.h` and `lib/libfmod.dylib`, version
 2.02.20. Alternatively, run `bash macos/arm64/extract-fmod.sh /path/to/fmodstudioapi20220mac-installer.dmg`
@@ -63,6 +79,8 @@ CMake projects.
 | --- | --- |
 | `config/macos-arm64.conf` | Component pins, Ruby/FMOD versions and deployment target. |
 | `config/macos-arm64-sources.lock` | Source archive URLs and SHA-256 hashes. |
+| `config/macos-arm64-tools.lock` | Fixed build-tool downloads and SHA-256 hashes. |
+| `macos/arm64/bootstrap-tools.sh` | Private pinned build tools; archive-only mode installs just 7-Zip. |
 | `.github/scripts/fetch-sources.sh` | Shared Linux/macOS pinned component fetching; also verifies macOS dependency archives. Replaces macOS `fetch.sh` and inline Linux checkout code. |
 | `.github/scripts/prepare-sfemovie-ruby.sh` | Shared Linux/macOS preparation of disposable Ruby binding checkouts: links matching pinned LiteRGSS/LiteCGSS headers. |
 | `tests/sfemovie-texture.rb` | Generates an uncompressed green AVI and reference PNG; checks actual movie pixels, Bitmap subclasses, snapshots and disposed/uninitialized objects. Called by macOS smoke verification. |
@@ -79,7 +97,7 @@ CMake projects.
 | `.github/workflows/build-macos-arm64.yml` | Builds on ARM64 macOS 14, verifies the archive on fresh macOS 15/26 runners and uploads runtime artifacts. |
 | `.github/workflows/build-linux-x86_64.yml` | Linux build extracted from the old combined workflow, using the same reusable workflow structure as macOS. |
 | `.github/workflows/release.yml` | Shared protected-tag entry point and publisher; replaces `release-linux-x86_64.yml`. |
-| `docker/linux-gnu/extract-fmod.sh` | Linux SDK extraction moved out of inline YAML, matching the macOS shell entry point. |
+| `linux/x86_64/extract-fmod.sh` | Linux SDK extraction moved out of inline YAML, matching the macOS shell entry point. |
 | `macos/arm64/README.md` | Reproduction, compatibility, validation and file rationale. |
 
 The existing downloader gains a macOS entry. The existing protected-tag release

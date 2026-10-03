@@ -19,10 +19,9 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Verify architecture and install build tools
+      - name: Bootstrap checksum-pinned build tools
         run: |
-          test "$(uname -m)" = arm64
-          brew install cmake ninja pkgconf sevenzip
+          bash macos/arm64/bootstrap-tools.sh
           python3 -m venv generated/download-venv
           generated/download-venv/bin/pip install requests==2.32.5
       - name: Read macOS release configuration
@@ -98,8 +97,8 @@ jobs:
       - name: Verify archive on a fresh ARM runner without build dependencies
         run: |
           test "$(uname -m)" = arm64
-          brew install sevenzip
+          bash macos/arm64/bootstrap-tools.sh archive
           (cd dist; shasum -a 256 -c MacOS-arm64.7z.sha256)
           mkdir -p generated/MacOS-arm64
-          7zz x dist/MacOS-arm64.7z -ogenerated/MacOS-arm64
+          "$PWD/generated/macos-arm64-tools/bin/7zz" x dist/MacOS-arm64.7z -ogenerated/MacOS-arm64
           bash macos/arm64/verify-release.sh

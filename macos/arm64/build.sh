@@ -6,8 +6,9 @@ source "$ROOT/config/macos-arm64.conf"
 export MACOSX_DEPLOYMENT_TARGET
 export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 export CC=/usr/bin/clang CXX=/usr/bin/clang++
-# Homebrew supplies build tools only. Never discover its runtime libraries.
-export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
+# CI selects private pinned tools; local Homebrew tools remain an alternative.
+# Never discover Homebrew runtime libraries.
+export PATH="${PSDK_BUILD_TOOLS_BIN:+$PSDK_BUILD_TOOLS_BIN:}/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
 unset RUBYOPT RUBYLIB GEM_HOME GEM_PATH CPATH LIBRARY_PATH DYLD_LIBRARY_PATH DYLD_FALLBACK_LIBRARY_PATH
 WORK="$ROOT/generated/macos-arm64"
 PREFIX="$WORK/prefix"

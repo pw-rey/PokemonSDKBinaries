@@ -12,6 +12,7 @@ fi
 mkdir -p "$output_dir"
 docker build --pull \
   --build-arg "RUBY_VERSION=$RUBY_VERSION" --build-arg "RUBY_SHA256=$RUBY_SHA256" \
-  -f "$repository_root/docker/linux-gnu/litergss/Dockerfile" \
+  --build-arg "RAKE_VERSION=$RAKE_VERSION" --build-arg "RAKE_COMPILER_VERSION=$RAKE_COMPILER_VERSION" \
+  -f "$repository_root/linux/x86_64/litergss/Dockerfile" \
   -t "$image_name" "$repository_root"
 docker run --rm -v "$source_dir:/source:ro" -v "$output_dir:/output" "$image_name"

@@ -6,17 +6,21 @@ Prebuilt runtime packages for projects made with [Pokémon SDK](https://gitlab.c
 
 | Platform | Architecture | Status |
 | --- | --- | --- |
-| Linux | x86-64 | Available through tagged releases |
-| Windows | x86 (32-bit) | CI build and local runtime validation |
-| macOS | ARM64 (Apple Silicon) | CI targets macOS 11.0 and later |
+| Linux | x86-64 | Tagged releases |
+| Windows | x86 (32-bit) | Tagged releases |
+| macOS | ARM64 (Apple Silicon) | Tagged releases |
 
-The Linux package is built for a **glibc 2.28** baseline. It has been validated on Ubuntu and Fedora-family distributions. The runtime expects a typical desktop graphics and audio stack: the system OpenGL driver, X11/XWayland libraries, and an ALSA-compatible audio stack.
+The protected-tag release workflow builds and verifies all three packages before publication. Each package embeds **Ruby 3.4.10**.
 
-Windows build instructions and validation: [windows/x86/README.md](windows/x86/README.md).
+The Linux package is built for a **glibc 2.28** baseline. It has been validated on distributions in the Ubuntu, Fedora, and Arch Linux families. The runtime expects a typical desktop graphics and audio stack: the system OpenGL driver, X11/XWayland libraries, and an ALSA-compatible audio stack.
+
+The macOS package targets **macOS 11.0 and later**. CI builds and tests on macOS 14, with separate archive verification on macOS 15 and 26; macOS 11–13 still need runtime testing. Windows CI builds and verifies the 32-bit package on Windows Server 2022.
+
+Build instructions and validation details: [Linux](linux/x86_64/DEPENDENCIES.md), [Windows](windows/x86/README.md), and [macOS](macos/arm64/README.md).
 
 ## Download and use
 
-Download `Linux-x86-64.7z`, `MacOS-arm64.7z` or `Windows-x86.7z` from the [latest release](../../releases/latest), then extract it. The Linux and macOS archives contain one top-level directory named `ruby-dist/`:
+Download `Linux-x86-64.7z`, `MacOS-arm64.7z` or `Windows-x86.7z` and `version.json` from the [latest release](../../releases/latest), verify the archive against its SHA-1 hash in the manifest, then extract it. The Linux and macOS archives contain one top-level directory named `ruby-dist/`:
 
 ```text
 ruby-dist/
@@ -26,13 +30,13 @@ ruby-dist/
 └── BUILD-INFO
 ```
 
-Place `ruby-dist/` where your Pokémon SDK project expects its embedded Ruby runtime. Before starting the game, load the environment prepared by `setup.sh`:
+Place `ruby-dist/` where your Pokémon SDK project expects its embedded Ruby runtime. Before starting the game, load the environment prepared by `setup.sh` from Bash:
 
 ```bash
 source /path/to/ruby-dist/setup.sh
 ```
 
-`setup.sh` configures the bundled Ruby, native-library search path, and Ruby load path for the current shell. `BUILD-INFO` records the component revisions used for that package.
+`setup.sh` selects the bundled Ruby and Ruby load path for the current shell. Linux also sets the native-library search path; macOS uses loader-relative library paths. `BUILD-INFO` records the component revisions used for that package.
 
 The Windows archive contains `lib/` and `ruby_builtin_dlls/` directly, alongside the bundled `ruby.exe`, `rubyw.exe` and `msvcrt-ruby340.dll`. Extract them together into your application directory. Its DLL assembly manifest is generated from the packaged dependencies; see the [Windows documentation](windows/x86/README.md).
 
@@ -41,9 +45,9 @@ The Windows archive contains `lib/` and `ruby_builtin_dlls/` directly, alongside
 The Linux x86-64 package contains:
 
 - LiteRGSS2 and LiteCGSS
-- Embedded Ruby
+- Embedded Ruby 3.4.10
 - SFML and SFMLAudio
-- RubyFMOD and FMOD Core 2.02
+- RubyFMOD and FMOD Core 2.02.20
 - sfeMovie, FFmpeg 6.1.6, and the `SFEMovie` Ruby binding
 
 FFmpeg includes the `png` and `mov_text` decoders required by the SDK's movie support. Graphics drivers, X11 integration, ALSA, and the system C++ runtime remain host-provided so they can match the target distribution and desktop driver stack.
@@ -51,7 +55,7 @@ FFmpeg includes the `png` and `mov_text` decoders required by the SDK's movie su
 Linux source dependencies are pinned by URL and SHA-256 in
 [config/linux-x86_64-sources.lock](config/linux-x86_64-sources.lock), using the
 same format and archive fetcher as macOS. The repository-owned Linux Docker
-builders consume these archives. See [Linux dependency notes](docker/linux-gnu/DEPENDENCIES.md)
+builders consume these archives. See [Linux dependency notes](linux/x86_64/DEPENDENCIES.md)
 for selected versions, compatibility constraints, and distribution packages.
 
 ## Releases
@@ -70,6 +74,14 @@ It downloads the archive and SHA-256 sidecar, checks the checksum, extracts the
 archive, and runs the existing glibc 2.28 functional checks. Publication waits
 for both the build and verification jobs to succeed.
 
+All three platforms run the same [runtime functional suite](tests/README.md), covering Ruby libraries, native bindings, audio decoding, movie playback and actual video pixels, alongside platform-specific binary audits.
+
+The final publication job also generates `version.json`. It retains the legacy
+manifest format: `version` is the release tag without its leading `v`, and
+`linux-x86-64`, `macos-arm64` and `windows-x86` contain the SHA-1 hashes of their
+respective `.7z` archives. Only the archives and `version.json` are published.
+SHA-256 sidecars remain internal CI artifacts for verification.
+
 Normal branch pushes and pull requests do not run the release workflow.
 
 The same protected tag builds `MacOS-arm64.7z` with Ruby **3.4.10** on Apple
@@ -85,7 +97,6 @@ The workflow is the supported release path. For local CI-style testing, install 
 ```bash
 act workflow_call \
   -W .github/workflows/build-linux-x86_64.yml \
-  -e ../.act/tag-push.json \
   -P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04 \
   --bind \
   -s FMOD_USER \
@@ -111,23 +122,29 @@ with the command above.
 
 ### Workflow and script conventions
 
+Platform tooling lives in `linux/x86_64/`, `macos/arm64/` and `windows/x86/`.
+The Linux directory includes its Docker builders and release scripts.
+
 `release.yml` is the only protected-tag entry point and the only publisher.
-It calls `build-linux-x86_64.yml` and `build-macos-arm64.yml`, both reusable
-workflows with read-only permissions and explicit FMOD secrets.
+It calls `build-linux-x86_64.yml`, `build-macos-arm64.yml` and
+`build-windows-x86.yml`, all reusable workflows with read-only permissions
+and explicit FMOD secrets.
 
-| Responsibility | Linux | macOS |
-| --- | --- | --- |
-| Configuration | `config/linux-x86_64.conf` | `config/macos-arm64.conf` |
-| Source fetching | `.github/scripts/fetch-sources.sh` | Same shared shell script |
-| Authorized SDK download | `.github/scripts/download_fmod.py` | Same shared Python script |
-| SDK extraction | `docker/linux-gnu/extract-fmod.sh` | `macos/arm64/extract-fmod.sh` |
-| Assembly | `docker/linux-gnu/assemble-release.sh` | `macos/arm64/assemble-release.sh` |
-| Verification | `docker/linux-gnu/verify-release.sh` | `macos/arm64/verify-release.sh` |
+| Responsibility | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| Configuration | `config/linux-x86_64.conf` | `config/macos-arm64.conf` | `config/windows-x86.conf` |
+| Source fetching | `.github/scripts/fetch-sources.sh` | Same shared shell script | `windows/x86/run.ps1 fetch` |
+| Authorized SDK download | `.github/scripts/download_fmod.py` | Same shared Python script | `windows/x86/run.ps1 download-fmod` |
+| SDK extraction | `linux/x86_64/extract-fmod.sh` | `macos/arm64/extract-fmod.sh` | `windows/x86/download-fmod.sh` |
+| Assembly | `linux/x86_64/assemble-release.sh` | `macos/arm64/assemble-release.sh` | `windows/x86/run.ps1 assemble` |
+| Verification | `linux/x86_64/verify-release.sh` | `macos/arm64/verify-release.sh` | `windows/x86/verify-runtime.ps1` |
 
-Assemblers take `OUTPUT_DIR` and optional `ARCHIVE_PATH`, and refuse non-empty
-destinations. Verifiers take `RELEASE_DIR`. Compilation remains platform-specific:
-Linux uses the established Docker component builders; macOS uses native shell
-build stages. macOS retains `mach_o.py` for binary path rewriting, signature
+Linux and macOS assemblers take `OUTPUT_DIR` and optional `ARCHIVE_PATH`, and refuse non-empty
+destinations. Their verifiers take `RELEASE_DIR`. Windows uses the commands and
+payload paths documented in its [build guide](windows/x86/README.md).
+Compilation remains platform-specific: Linux uses Docker component builders;
+macOS uses native shell build stages; Windows uses a private, checksum-pinned
+MSYS2 toolchain. macOS retains `mach_o.py` for binary path rewriting, signature
 checks and safe symlink resolution. Its `archive-release.sh` helper tests archive
 extraction on macOS. Those operations are separate from shell file assembly.
 
@@ -142,17 +159,23 @@ Create these **repository Actions secrets** under **Settings → Secrets and var
 | `FMOD_USER` | FMOD account username or email authorized to download the SDK |
 | `FMOD_PASSWORD` | Password for that FMOD account |
 
-The workflow uses them only in the trusted tag workflow to obtain the Linux and macOS FMOD SDKs. Never commit them, add them as Actions variables, or expose them to pull-request workflows. A dedicated FMOD account with the minimum required download entitlement is recommended.
+The release workflow passes these secrets to all three platform builders to obtain their FMOD SDKs. None of the platform workflows has a manual trigger. Never commit them, add them as Actions variables, or expose them to pull-request workflows. A dedicated FMOD account with the minimum required download entitlement is recommended.
 
 ### Release security
 
 Protect the `v*` tag pattern with a GitHub ruleset and allow only maintainers or the release team to create, update, or delete matching tags. This is essential because a tag push authorizes the workflow to access the FMOD secrets and publish a release.
 
-The workflow has no branch-push, pull-request, or manual-dispatch trigger. It pins component source commits and GitHub Actions by revision, restricts default permissions to read-only, and grants release-write permission only to the final publication job.
+An authorization job checks that the event is a `v*` tag push and GitHub reports
+the tag as protected. It fails before any platform build starts if that check
+fails. Configure an active tag ruleset in the release repository (and any fork
+used for tagged CI testing); the workflow cannot create that repository setting
+or determine who the ruleset permits solely from the protection flag.
+
+`release.yml` has no branch-push, pull-request, or manual-dispatch trigger. The workflows pin component source commits and GitHub Actions by revision, restrict default permissions to read-only, and grant release-write permission only to the final publication job.
 
 ### FMOD runtime and licensing
 
-The Linux and macOS releases contain only the FMOD runtime library (`libfmod.so` or `libfmod.dylib`); a future Windows release will likewise contain only the required FMOD `.dll` runtime. They do **not** publish FMOD SDK headers, static libraries, import libraries, or other development files.
+The releases contain only the platform's FMOD runtime library (`libfmod.so`, `libfmod.dylib` or `fmod.dll`). They do **not** publish FMOD SDK headers, static libraries, import libraries, or other development files.
 
 That separation alone does not automatically grant redistribution rights. FMOD is proprietary software, and the [FMOD EULA](https://www.fmod.com/legal) requires the FMOD Engine to be integrated and redistributed in a qualifying software application/product, subject to the licence tier and its conditions. In particular, the EULA's listed licence grants restrict distribution as part of a game engine or tool set. Maintainers and downstream projects must confirm that their intended distribution is covered by the applicable FMOD licence before publishing or redistributing a package.
 
@@ -160,7 +183,9 @@ The authenticated CI download approach was informed by the open-source [utopia-r
 
 ## Contributing
 
-Changes to a release component should be merged upstream first. Then update its immutable repository URL and commit pin in [config/linux-x86_64.conf](config/linux-x86_64.conf), run the Linux workflow with `act`, and publish a new protected `v*` tag after review.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for component-update guidelines and the
+requirements for adding an OS or architecture, including packaging, verification
+and release integration.
 
 ## License
 

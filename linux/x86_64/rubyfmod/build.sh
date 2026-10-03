@@ -35,4 +35,4 @@ docker run --rm --entrypoint /bin/bash \
   -v "${fmod_sdk_dir}:/fmod:ro" \
   -v "${output_dir}:/output" \
   "${image_name}" \
-  /config/docker/linux-gnu/rubyfmod/entrypoint.sh
+  /config/linux/x86_64/rubyfmod/entrypoint.sh

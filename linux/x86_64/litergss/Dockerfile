@@ -2,6 +2,8 @@ FROM quay.io/pypa/manylinux_2_28_x86_64@sha256:4dc41da7df20400310c80d162a2fe2d2c
 
 ARG RUBY_VERSION
 ARG RUBY_SHA256
+ARG RAKE_VERSION
+ARG RAKE_COMPILER_VERSION
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # A lock change also invalidates the distro package update layer.
 COPY config/linux-x86_64-sources.lock /opt/psdk/sources.lock
@@ -15,7 +17,7 @@ RUN dnf upgrade -y --refresh \
  && rpm -qa --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort > /opt/psdk/distribution-packages.txt
 
 COPY sources/archives/ /opt/psdk/archives/
-COPY docker/linux-gnu/locked-source.sh docker/linux-gnu/build-dependencies.sh /opt/psdk/
+COPY linux/x86_64/locked-source.sh linux/x86_64/build-dependencies.sh /opt/psdk/
 RUN bash /opt/psdk/build-dependencies.sh
 ENV PKG_CONFIG_PATH=/opt/psdk/deps/lib/pkgconfig:/opt/psdk/deps/share/pkgconfig
 ENV CMAKE_PREFIX_PATH=/opt/psdk/deps
@@ -34,7 +36,10 @@ RUN source /opt/psdk/locked-source.sh \
 
 # The image uses AlmaLinux's CA bundle; the shipped setup selects the host bundle.
 RUN SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt \
-      /opt/litergss/ruby/bin/gem install --no-document rake rake-compiler
+      /opt/litergss/ruby/bin/gem install --no-document --minimal-deps rake --version "$RAKE_VERSION" \
+ && SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt \
+      /opt/litergss/ruby/bin/gem install --no-document --ignore-dependencies rake-compiler --version "$RAKE_COMPILER_VERSION" \
+ && /opt/litergss/ruby/bin/ruby -e 'gem "rake", ENV.fetch("RAKE_VERSION"); gem "rake-compiler", ENV.fetch("RAKE_COMPILER_VERSION"); require "rake/extensiontask"'
 
 RUN source /opt/psdk/locked-source.sh \
  && extract_source sfml \
@@ -69,8 +74,8 @@ RUN cd /tmp/sfmlaudio/ext/SFMLAudio \
 # Reuse the pinned component's staging logic, with Linux dependency relocation.
 COPY sources/litergss/docker/linux-gnu/entrypoint.sh /usr/local/bin/upstream-entrypoint.sh
 COPY sources/litergss/docker/linux-gnu/setup.sh /usr/local/bin/setup.sh
-COPY docker/linux-gnu/litergss/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY docker/linux-gnu/litergss/setup-ca.sh /tmp/setup-ca.sh
+COPY linux/x86_64/litergss/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY linux/x86_64/litergss/setup-ca.sh /tmp/setup-ca.sh
 RUN cat /tmp/setup-ca.sh >> /usr/local/bin/setup.sh \
  && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/upstream-entrypoint.sh /usr/local/bin/setup.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

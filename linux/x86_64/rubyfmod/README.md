@@ -22,7 +22,7 @@ Build LiteRGSS first, then run from this repository:
 SOURCE_DIR=/path/to/Ruby-Fmod \
 FMOD_SDK_DIR=/path/to/fmod-core \
 RUBY_VERSION=3.4.10 \
-docker/linux-gnu/rubyfmod/build.sh
+linux/x86_64/rubyfmod/build.sh
 ```
 
 Set `OUTPUT_DIR` to choose an empty destination. The result contains
